@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #07060f;
+  --bg-surface: #0e0c18;
+  --bg-elevated: #141222;
+  --bg-card: #12101f;
+  --bg-glass: rgba(139, 92, 246, 0.06);
+
+  --accent-primary: #a855f7;
+  --accent-primary-dim: #7c3aed;
+  --accent-glow: #c084fc;
+  --accent-violet: #a855f7;
+  --accent-teal: #34d399;
+  --accent-amber: #fbbf24;
+  --accent-red: #f87171;
+  --accent-blue: #818cf8;
+
+  --border-purple: rgba(168, 85, 247, 0.45);
+  --border-purple-strong: rgba(192, 132, 252, 0.65);
+  --border-subtle: rgba(168, 85, 247, 0.18);
+  --border-hover: rgba(192, 132, 252, 0.4);
+
+  --text-primary: #f3f0ff;
+  --text-secondary: #a89ec9;
+  --text-muted: #5c5478;
+
+  --gradient-hero: radial-gradient(
+      ellipse 80% 60% at 20% 20%,
+      rgba(124, 58, 237, 0.35),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 80% 70%,
+      rgba(168, 85, 247, 0.2),
+      transparent 50%
+    ),
+    radial-gradient(ellipse 50% 40% at 50% 100%, #0a0814, #07060f);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@layer utilities {
+  .bg-mesh {
+    background: var(--gradient-hero);
+  }
+
+  .border-purple {
+    border-color: var(--border-purple);
+  }
+
+  .border-purple-strong {
+    border-color: var(--border-purple-strong);
+  }
+
+  .glow-purple {
+    box-shadow:
+      0 0 0 1px var(--border-purple),
+      0 0 40px rgba(168, 85, 247, 0.15),
+      0 24px 48px rgba(0, 0, 0, 0.45);
+  }
+
+  .glow-purple-sm {
+    box-shadow:
+      0 0 0 1px var(--border-purple),
+      0 0 24px rgba(168, 85, 247, 0.12);
+  }
+
+  .text-gradient-purple {
+    background: linear-gradient(135deg, #e9d5ff, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
