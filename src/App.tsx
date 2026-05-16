@@ -9,6 +9,8 @@ import ManagerView from './pages/ManagerView'
 import AdminPanel from './pages/AdminPanel'
 import Reports from './pages/Reports'
 import AuditLog from './pages/AuditLog'
+import Analysis from './pages/Analysis'
+import Profile from './pages/Profile'
 
 export default function App() {
   return (
@@ -22,6 +24,8 @@ export default function App() {
             <Route path="/my-goals" element={<MyGoals />} />
             <Route path="/manager" element={<ManagerView />} />
             <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/analysis" element={<Analysis />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/audit" element={<AuditLog />} />
           </Route>

@@ -14,7 +14,6 @@ import { useOrgStore } from '../store/orgStore'
 import { useGoalStore } from '../store/goalStore'
 import { computeWeightedScore, validateGoalSheet } from '../lib/scoreEngine'
 import { buildEmployeeTasks } from '../lib/employeeTasks'
-import PersonalNeuronGraph from '../components/neuron/PersonalNeuronGraph'
 import Card from '../components/ui/Card'
 import GoalCard from '../components/goals/GoalCard'
 import CheckInCalendar from '../components/checkin/CheckInCalendar'
@@ -73,7 +72,7 @@ export default function Dashboard() {
             Welcome back, {user.name.split(' ')[0]}
           </h1>
           <p className="text-sm text-[var(--text-secondary)]">
-            Your workspace · goals, tasks, and knowledge graph
+            Your workspace · goals and tasks at a glance
           </p>
         </motion.div>
 
@@ -118,14 +117,8 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-3">
-          <div className="xl:col-span-2 space-y-6">
-            <PersonalNeuronGraph
-              employee={emp}
-              tasks={displayTasks.filter((t) => !t.done).slice(0, 8)}
-              height={440}
-            />
-
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
             {sheetErrors.length > 0 && (
               <motion.div className="rounded-xl border border-accent-amber/40 bg-accent-amber/10 px-4 py-3 text-sm text-accent-amber">
                 {sheetErrors[0]}
@@ -223,24 +216,6 @@ export default function Dashboard() {
             </Card>
 
             <CheckInCalendar />
-
-            <Card className="border-purple">
-              <h3 className="font-heading text-sm font-bold">Quick links</h3>
-              <div className="mt-3 flex flex-col gap-2">
-                {[
-                  { to: '/my-goals', label: 'Goal sheet & weightage' },
-                  { to: '/reports', label: 'My achievement report' },
-                ].map((l) => (
-                  <Link
-                    key={l.to}
-                    to={l.to}
-                    className="rounded-lg border border-purple/60 px-3 py-2 text-sm text-[var(--text-secondary)] hover:border-purple-strong hover:text-accent-glow"
-                  >
-                    {l.label} →
-                  </Link>
-                ))}
-              </div>
-            </Card>
           </div>
         </div>
       </div>

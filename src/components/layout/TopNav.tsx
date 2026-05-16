@@ -1,37 +1,28 @@
 import { useState } from 'react'
+import { useThemeStore } from '../../store/themeStore'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
-import {
-  LayoutDashboard,
-  Target,
-  CalendarCheck,
-  BarChart3,
-  Users,
-  Shield,
-  FileText,
-  LogOut,
-  ChevronDown,
-  Menu,
-  X,
-} from 'lucide-react'
+import { LogOut, ChevronDown, Menu, X, Sun, Moon, User } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
-import { COMPANY_NAME, FISCAL_YEAR } from '../../lib/constants'
+import { COMPANY_NAME } from '../../lib/constants'
 
 const employeeLinks = [
-  { to: '/dashboard', label: 'Home', icon: LayoutDashboard },
-  { to: '/my-goals', label: 'My Goals', icon: Target },
-  { to: '/dashboard', label: 'Check-ins', icon: CalendarCheck },
-  { to: '/reports', label: 'Reports', icon: BarChart3 },
+  { to: '/dashboard', label: 'Home' },
+  { to: '/my-goals', label: 'My Goals' },
+  { to: '/analysis', label: 'Analysis' },
+  { to: '/reports', label: 'Reports' },
 ]
 
 const managerLinks = [
-  { to: '/manager', label: 'Team', icon: Users },
-  { to: '/reports', label: 'Reports', icon: BarChart3 },
+  { to: '/manager', label: 'Team' },
+  { to: '/analysis', label: 'Analysis' },
+  { to: '/reports', label: 'Reports' },
 ]
 
 const adminLinks = [
-  { to: '/admin', label: 'Admin', icon: Shield },
-  { to: '/audit', label: 'Audit', icon: FileText },
-  { to: '/reports', label: 'Reports', icon: BarChart3 },
+  { to: '/admin', label: 'Admin' },
+  { to: '/analysis', label: 'Analysis' },
+  { to: '/audit', label: 'Audit' },
+  { to: '/reports', label: 'Reports' },
 ]
 
 export default function TopNav() {
@@ -40,6 +31,8 @@ export default function TopNav() {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
+  const theme = useThemeStore((s) => s.theme)
+  const toggleTheme = useThemeStore((s) => s.toggle)
 
   const links =
     user?.role === 'admin'
@@ -54,85 +47,73 @@ export default function TopNav() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-purple bg-bg-surface/90 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-6 px-4 lg:px-6">
-        <Link to={user ? '/dashboard' : '/'} className="flex shrink-0 items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-purple bg-accent-violet/20 font-heading text-xs font-bold text-accent-glow">
-            AQ
+    <header className="glass-header sticky top-0 z-50 px-4 py-3 lg:px-8">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+        <Link to={user ? '/dashboard' : '/'} className="flex shrink-0 items-center gap-3">
+          <div className="glass-logo-ring flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-gradient-to-br from-violet-500/40 to-violet-900/60">
+            <span className="text-[9px] font-bold text-white">AQ</span>
           </div>
-          <div className="hidden sm:block">
-            <p className="font-heading text-sm font-bold leading-none">{COMPANY_NAME}</p>
-            <p className="text-[10px] text-[var(--text-muted)]">{FISCAL_YEAR}</p>
-          </div>
+          <span className="font-heading text-base font-semibold text-white light:text-slate-900">
+            {COMPANY_NAME}
+          </span>
         </Link>
 
         {user && (
-          <nav className="hidden flex-1 items-center gap-1 md:flex">
-            {links.map(({ to, label, icon: Icon }) => (
+          <nav className="glass-nav-bar absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 rounded-full px-2 py-1.5 md:flex">
+            {links.map(({ to, label }) => (
               <NavLink
                 key={to + label}
                 to={to}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-accent-violet/15 text-accent-glow'
-                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-glass)] hover:text-[var(--text-primary)]'
-                  }`
+                  `glass-nav-link rounded-full px-4 py-2 text-sm font-medium ${isActive ? 'glass-nav-link-active' : ''}`
                 }
               >
-                <Icon size={15} />
                 {label}
               </NavLink>
             ))}
           </nav>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {!user ? (
             <>
-              <Link
-                to="/login"
-                className="hidden rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] sm:block"
-              >
+              <Link to="/login" className="glass-btn-ghost hidden text-sm sm:block">
                 Sign in
               </Link>
-              <Link
-                to="/login"
-                className="rounded-lg border border-purple bg-accent-violet px-4 py-2 text-sm font-medium text-white hover:bg-accent-violet/90"
-              >
+              <Link to="/login" className="glass-btn-primary rounded-full px-5 py-2 text-sm font-medium">
                 Get started
               </Link>
             </>
           ) : (
-            <div className="relative">
+            <div className="relative hidden sm:block">
               <button
                 type="button"
                 onClick={() => setUserOpen(!userOpen)}
-                className="flex items-center gap-2 rounded-lg border border-purple px-2 py-1.5 pl-1.5 hover:bg-[var(--bg-glass)]"
+                className="glass-btn-ghost flex items-center gap-2 text-sm"
               >
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent-violet/30 text-xs font-bold text-accent-glow">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-violet-700 text-xs font-bold text-white">
                   {user.initials}
                 </div>
-                <span className="hidden max-w-[120px] truncate text-sm sm:block">
-                  {user.name.split(' ')[0]}
-                </span>
-                <ChevronDown size={14} className="text-[var(--text-secondary)]" />
+                <ChevronDown size={14} />
               </button>
               {userOpen && (
                 <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setUserOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full z-50 mt-2 w-52 rounded-xl border border-purple-strong bg-bg-elevated p-2 glow-purple-sm">
-                    <p className="px-3 py-2 text-sm font-medium">{user.name}</p>
-                    <p className="px-3 pb-2 text-xs capitalize text-[var(--text-secondary)]">
-                      {user.role}
-                    </p>
+                  <div className="fixed inset-0 z-40" onClick={() => setUserOpen(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl border border-white/10 bg-[#12101f]/95 p-2 backdrop-blur-xl">
+                    <p className="px-3 py-2 text-sm font-medium text-white">{user.name}</p>
+                    <p className="px-3 pb-2 text-xs capitalize text-slate-400">{user.role}</p>
+                    <Link
+                      to="/profile"
+                      onClick={() => setUserOpen(false)}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-300 hover:bg-white/5 hover:text-white"
+                    >
+                      <User size={14} />
+                      My Profile
+                    </Link>
                     <button
                       type="button"
                       onClick={handleLogout}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-accent-red hover:bg-accent-red/10"
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-400 hover:bg-red-500/10"
                     >
                       <LogOut size={14} />
                       Sign out
@@ -143,10 +124,19 @@ export default function TopNav() {
             </div>
           )}
 
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="glass-btn-ghost flex h-9 w-9 items-center justify-center rounded-full"
+            title="Toggle theme"
+          >
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
+
           {user && (
             <button
               type="button"
-              className="rounded-lg border border-purple p-2 md:hidden"
+              className="glass-btn-ghost rounded-full p-2 md:hidden"
               onClick={() => setMenuOpen(!menuOpen)}
             >
               {menuOpen ? <X size={18} /> : <Menu size={18} />}
@@ -156,19 +146,16 @@ export default function TopNav() {
       </div>
 
       {user && menuOpen && (
-        <nav className="border-t border-purple px-4 py-3 md:hidden">
-          {links.map(({ to, label, icon: Icon }) => (
+        <nav className="glass-nav-bar mx-auto mt-3 flex max-w-6xl flex-col gap-1 rounded-2xl p-2 md:hidden">
+          {links.map(({ to, label }) => (
             <NavLink
               key={to + label}
               to={to}
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm ${
-                  isActive ? 'text-accent-glow' : 'text-[var(--text-secondary)]'
-                }`
+                `glass-nav-link rounded-xl px-4 py-2.5 text-sm ${isActive ? 'glass-nav-link-active' : ''}`
               }
             >
-              <Icon size={16} />
               {label}
             </NavLink>
           ))}

@@ -38,6 +38,44 @@
       transparent 50%
     ),
     radial-gradient(ellipse 50% 40% at 50% 100%, #0a0814, #07060f);
+
+  --shadow-glow-large: 0 24px 48px rgba(0, 0, 0, 0.45);
+}
+
+.light {
+  --bg-primary: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-glass: rgba(139, 92, 246, 0.08);
+
+  --accent-primary: #8b5cf6;
+  --accent-primary-dim: #7c3aed;
+  --accent-glow: #6d28d9;
+  --accent-violet: #8b5cf6;
+
+  --border-purple: rgba(139, 92, 246, 0.25);
+  --border-purple-strong: rgba(139, 92, 246, 0.45);
+  --border-subtle: rgba(139, 92, 246, 0.15);
+  --border-hover: rgba(139, 92, 246, 0.35);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+
+  --shadow-glow-large: 0 24px 48px rgba(139, 92, 246, 0.15);
+
+  --gradient-hero: radial-gradient(
+      ellipse 80% 60% at 20% 20%,
+      rgba(139, 92, 246, 0.12),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 80% 70%,
+      rgba(168, 85, 247, 0.08),
+      transparent 50%
+    ),
+    radial-gradient(ellipse 50% 40% at 50% 100%, #ffffff, #f8fafc);
 }
 
 * {
@@ -51,6 +89,7 @@ body {
   color: var(--text-primary);
   font-family: 'DM Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #root {
@@ -74,7 +113,7 @@ body {
     box-shadow:
       0 0 0 1px var(--border-purple),
       0 0 40px rgba(168, 85, 247, 0.15),
-      0 24px 48px rgba(0, 0, 0, 0.45);
+      var(--shadow-glow-large);
   }
 
   .glow-purple-sm {
@@ -88,5 +127,113 @@ body {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  .light .text-gradient-purple {
+    background: linear-gradient(135deg, #6d28d9, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glass-header {
+    background: transparent;
+  }
+
+  .glass-logo-ring {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.12),
+      0 0 24px rgba(139, 92, 246, 0.45);
+  }
+
+  .glass-nav-bar {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 8px 32px rgba(0, 0, 0, 0.35);
+  }
+
+  .light .glass-nav-bar {
+    background: rgba(255, 255, 255, 0.65);
+    border-color: rgba(139, 92, 246, 0.2);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 8px 24px rgba(139, 92, 246, 0.12);
+  }
+
+  .glass-nav-link {
+    color: rgba(255, 255, 255, 0.75);
+    transition: color 0.2s ease;
+  }
+
+  .glass-nav-link:hover {
+    color: #fff;
+  }
+
+  .light .glass-nav-link {
+    color: rgba(15, 23, 42, 0.65);
+  }
+
+  .light .glass-nav-link:hover {
+    color: #0f172a;
+  }
+
+  .glass-nav-link-active {
+    background: linear-gradient(
+      180deg,
+      rgba(167, 139, 250, 0.95) 0%,
+      rgba(124, 58, 237, 0.9) 45%,
+      rgba(91, 33, 182, 0.95) 100%
+    );
+    color: #fff !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 4px 20px rgba(124, 58, 237, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-btn-primary {
+    background: linear-gradient(
+      180deg,
+      rgba(167, 139, 250, 0.95) 0%,
+      rgba(124, 58, 237, 0.95) 50%,
+      rgba(91, 33, 182, 1) 100%
+    );
+    color: #fff;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      0 4px 24px rgba(124, 58, 237, 0.45);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .glass-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 6px 28px rgba(124, 58, 237, 0.55);
+  }
+
+  .glass-btn-ghost {
+    color: rgba(255, 255, 255, 0.8);
+    transition: color 0.2s ease;
+  }
+
+  .glass-btn-ghost:hover {
+    color: #fff;
+  }
+
+  .light .glass-btn-ghost {
+    color: rgba(15, 23, 42, 0.7);
+  }
+
+  .light .glass-header .font-heading {
+    color: #0f172a;
+  }
+
+  .light .glass-logo-ring span {
+    color: #fff;
   }
 }
