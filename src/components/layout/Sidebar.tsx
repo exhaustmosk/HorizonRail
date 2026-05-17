@@ -2,7 +2,6 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
   Target,
-  CalendarCheck,
   BarChart3,
   Users,
   Shield,
@@ -15,7 +14,6 @@ import { COMPANY_NAME } from '../../lib/constants'
 const employeeLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/my-goals', label: 'My Goals', icon: Target },
-  { to: '/dashboard', label: 'Check-ins', icon: CalendarCheck },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
 ]
 

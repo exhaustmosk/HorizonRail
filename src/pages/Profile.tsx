@@ -56,6 +56,7 @@ export default function Profile() {
             </li>
           </ul>
         </Card>
+      </div>
     </div>
   )
 }

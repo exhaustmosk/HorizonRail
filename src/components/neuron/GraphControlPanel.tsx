@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import {
   LayoutGrid,
   Download,
@@ -10,12 +10,14 @@ import {
   EyeOff,
   Pause,
   Play,
+  ChevronDown,
 } from 'lucide-react'
-import type { GraphLayoutId } from '../../lib/graphLayouts'
-import { LAYOUT_LABELS } from '../../lib/graphLayouts'
+import type { GraphLayoutId, GraphSpacingId, NeuronGraphMode } from '../../lib/neuronGraph'
+import { LAYOUT_LABELS, SPACING_LABELS } from '../../lib/neuronGraph'
 
 export interface GraphPanelSettings {
   layout: GraphLayoutId
+  spacing: GraphSpacingId
   showBurst: boolean
   showSunLinks: boolean
   labelsAlways: boolean
@@ -23,6 +25,7 @@ export interface GraphPanelSettings {
 }
 
 interface GraphControlPanelProps {
+  mode?: NeuronGraphMode
   settings: GraphPanelSettings
   onSettingsChange: (patch: Partial<GraphPanelSettings>) => void
   onResetView: () => void
@@ -54,6 +57,7 @@ function ToggleRow({
 }
 
 export default function GraphControlPanel({
+  mode = 'personal',
   settings,
   onSettingsChange,
   onResetView,
@@ -63,15 +67,28 @@ export default function GraphControlPanel({
   onExportPng,
 }: GraphControlPanelProps) {
   const fileRef = useRef<HTMLInputElement>(null)
+  const [collapsed, setCollapsed] = useState(false)
 
   return (
     <div className="absolute right-4 top-4 z-20 flex max-w-[280px] flex-col gap-2 sm:right-6 sm:top-6">
-      <div className="rounded-2xl border border-white/10 bg-black/75 p-3 backdrop-blur-xl">
-        <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-violet-300">
-          <LayoutGrid size={14} />
-          Graph controls
-        </p>
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/75 backdrop-blur-xl">
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex w-full items-center justify-between gap-2 p-3 text-left"
+        >
+          <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-violet-300">
+            <LayoutGrid size={14} />
+            Graph controls
+          </span>
+          <ChevronDown
+            size={14}
+            className={`text-slate-400 transition-transform ${collapsed ? '-rotate-90' : ''}`}
+          />
+        </button>
 
+        {!collapsed && (
+          <div className="border-t border-white/10 px-3 pb-3 pt-1">
         <label className="mb-1 block text-[10px] text-slate-400">Layout</label>
         <select
           value={settings.layout}
@@ -85,17 +102,34 @@ export default function GraphControlPanel({
           ))}
         </select>
 
+        <label className="mb-1 block text-[10px] text-slate-400">Spacing</label>
+        <select
+          value={settings.spacing}
+          onChange={(e) => onSettingsChange({ spacing: e.target.value as GraphSpacingId })}
+          className="mb-3 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500/50"
+        >
+          {(Object.keys(SPACING_LABELS) as GraphSpacingId[]).map((id) => (
+            <option key={id} value={id} className="bg-zinc-900">
+              {SPACING_LABELS[id]}
+            </option>
+          ))}
+        </select>
+
         <div className="mb-3 space-y-0.5 border-t border-white/10 pt-2">
-          <ToggleRow
-            label="Hub burst lines"
-            on={settings.showBurst}
-            onToggle={() => onSettingsChange({ showBurst: !settings.showBurst })}
-          />
-          <ToggleRow
-            label="Sun connector rays"
-            on={settings.showSunLinks}
-            onToggle={() => onSettingsChange({ showSunLinks: !settings.showSunLinks })}
-          />
+          {mode === 'personal' && (
+            <>
+              <ToggleRow
+                label="Hub burst lines"
+                on={settings.showBurst}
+                onToggle={() => onSettingsChange({ showBurst: !settings.showBurst })}
+              />
+              <ToggleRow
+                label="Sun connector rays"
+                on={settings.showSunLinks}
+                onToggle={() => onSettingsChange({ showSunLinks: !settings.showSunLinks })}
+              />
+            </>
+          )}
           <ToggleRow
             label="Always show labels"
             on={settings.labelsAlways}
@@ -159,6 +193,8 @@ export default function GraphControlPanel({
             e.target.value = ''
           }}
         />
+          </div>
+        )}
       </div>
     </div>
   )

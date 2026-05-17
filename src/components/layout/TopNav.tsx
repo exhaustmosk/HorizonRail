@@ -25,6 +25,21 @@ const adminLinks = [
   { to: '/reports', label: 'Reports' },
 ]
 
+function BrandLogo() {
+  return (
+    <div className="glass-logo-ring flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-gradient-to-br from-violet-500/50 to-violet-950/80">
+      <svg viewBox="0 0 20 20" className="h-4 w-4 text-white" aria-hidden>
+        <path
+          fill="currentColor"
+          d="M6 14V6h8l-3.2 3.2L14 12.4 10.4 9 6 14z"
+          opacity="0.95"
+        />
+        <path fill="currentColor" d="M6 6h3.5L6 9.5V6z" opacity="0.55" />
+      </svg>
+    </div>
+  )
+}
+
 export default function TopNav() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
@@ -46,20 +61,27 @@ export default function TopNav() {
     navigate('/')
   }
 
+  const closeMenus = () => {
+    setMenuOpen(false)
+    setUserOpen(false)
+  }
+
   return (
-    <header className="glass-header sticky top-0 z-50 px-4 py-3 lg:px-8">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-        <Link to={user ? '/dashboard' : '/'} className="flex shrink-0 items-center gap-3">
-          <div className="glass-logo-ring flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-gradient-to-br from-violet-500/40 to-violet-900/60">
-            <span className="text-[9px] font-bold text-white">AQ</span>
-          </div>
+    <header className="glass-header-shell sticky top-0 z-50">
+      <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 lg:px-8">
+        <Link
+          to={user ? '/dashboard' : '/'}
+          className="flex shrink-0 items-center gap-3"
+          onClick={closeMenus}
+        >
+          <BrandLogo />
           <span className="font-heading text-base font-semibold text-white light:text-slate-900">
             {COMPANY_NAME}
           </span>
         </Link>
 
         {user && (
-          <nav className="glass-nav-bar absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 rounded-full px-2 py-1.5 md:flex">
+          <nav className="glass-nav-bar absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 rounded-full p-1 md:flex">
             {links.map(({ to, label }) => (
               <NavLink
                 key={to + label}
@@ -77,11 +99,17 @@ export default function TopNav() {
         <div className="flex items-center gap-3">
           {!user ? (
             <>
-              <Link to="/login" className="glass-btn-ghost hidden text-sm sm:block">
-                Sign in
+              <Link
+                to="/login"
+                className="glass-btn-ghost hidden rounded-full px-3 py-2 text-sm sm:block"
+              >
+                Log in
               </Link>
-              <Link to="/login" className="glass-btn-primary rounded-full px-5 py-2 text-sm font-medium">
-                Get started
+              <Link
+                to="/login"
+                className="glass-btn-primary rounded-full px-5 py-2 text-sm font-medium"
+              >
+                Sign up
               </Link>
             </>
           ) : (
@@ -91,10 +119,13 @@ export default function TopNav() {
                 onClick={() => setUserOpen(!userOpen)}
                 className="glass-btn-ghost flex items-center gap-2 text-sm"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-violet-700 text-xs font-bold text-white">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-violet-700 text-xs font-bold text-white shadow-[0_0_16px_rgba(124,58,237,0.45)]">
                   {user.initials}
                 </div>
-                <ChevronDown size={14} />
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform ${userOpen ? 'rotate-180' : ''}`}
+                />
               </button>
               {userOpen && (
                 <>
@@ -146,12 +177,12 @@ export default function TopNav() {
       </div>
 
       {user && menuOpen && (
-        <nav className="glass-nav-bar mx-auto mt-3 flex max-w-6xl flex-col gap-1 rounded-2xl p-2 md:hidden">
+        <nav className="glass-nav-bar mx-4 mb-3 flex flex-col gap-0.5 rounded-2xl p-2 md:hidden lg:mx-8">
           {links.map(({ to, label }) => (
             <NavLink
               key={to + label}
               to={to}
-              onClick={() => setMenuOpen(false)}
+              onClick={closeMenus}
               className={({ isActive }) =>
                 `glass-nav-link rounded-xl px-4 py-2.5 text-sm ${isActive ? 'glass-nav-link-active' : ''}`
               }
@@ -159,6 +190,25 @@ export default function TopNav() {
               {label}
             </NavLink>
           ))}
+          <Link
+            to="/profile"
+            onClick={closeMenus}
+            className="glass-nav-link flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm"
+          >
+            <User size={14} />
+            My Profile
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              closeMenus()
+              handleLogout()
+            }}
+            className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10"
+          >
+            <LogOut size={14} />
+            Sign out
+          </button>
         </nav>
       )}
     </header>

@@ -64,20 +64,5 @@ export function buildEmployeeTasks(employee: Employee): EmployeeTask[] {
     })
   }
 
-  tasks.push(
-    {
-      id: 'task-review-manager',
-      title: 'Review manager comments on Q1',
-      done: false,
-      priority: 'low',
-    },
-    {
-      id: 'task-update-profile',
-      title: 'Confirm FY26 development plan',
-      done: true,
-      priority: 'low',
-    },
-  )
-
   return tasks
 }

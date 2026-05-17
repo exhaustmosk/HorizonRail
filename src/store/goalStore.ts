@@ -129,7 +129,21 @@ export const useGoalStore = create<GoalStore>(() => ({
   },
 
   pushKPI: (kpi, employeeIds) => {
-    employeeIds.forEach((empId) => {
+    const user = useAuthStore.getState().user
+    let ids = employeeIds
+
+    if (user?.role === 'manager') {
+      const allowed = new Set(
+        useOrgStore
+          .getState()
+          .getDirectReports(user.id)
+          .map((e) => e.id),
+      )
+      ids = employeeIds.filter((id) => allowed.has(id))
+      if (ids.length === 0) return
+    }
+
+    ids.forEach((empId) => {
       const goal: Goal = {
         id: `g-push-${empId}-${Date.now()}`,
         employeeId: empId,
@@ -149,7 +163,7 @@ export const useGoalStore = create<GoalStore>(() => ({
       }
       useGoalStore.getState().addGoal(goal)
     })
-    audit('KPI_PUSHED', kpi.title ?? 'KPI', kpi.title ?? '', '', `${employeeIds.length} employees`)
+    audit('KPI_PUSHED', kpi.title ?? 'KPI', kpi.title ?? '', '', `${ids.length} employees`)
   },
 
   lockAllApproved: () => {

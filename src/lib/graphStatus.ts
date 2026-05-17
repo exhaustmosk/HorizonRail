@@ -3,7 +3,7 @@ import { computeScore } from './scoreEngine'
 
 /** Plain status colors for graph moons */
 export const STATUS_COLORS = {
-  untouched: '#c4b5fd',
+  untouched: '#94a3b8',
   partial: '#fbbf24',
   complete: '#22c55e',
   error: '#ef4444',

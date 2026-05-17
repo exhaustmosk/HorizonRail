@@ -1,4 +1,5 @@
 import { useRef, useCallback } from 'react'
+import type { GraphLayoutId } from '../../lib/neuronGraph'
 
 export type NodeType = 'sun' | 'planet' | 'moon'
 
@@ -19,6 +20,9 @@ export interface SolarNode {
   targetY: number
   depth: number
   fixed?: boolean
+  isLeaf?: boolean
+  /** Set by layered tree layout — use fixed x,y (no physics). */
+  layer?: number
   meta?: Record<string, unknown>
 }
 
@@ -30,102 +34,107 @@ export interface SolarEdge {
   burst?: { angle: number; len: number }
 }
 
-const SPRING_K = 0.065
-const DAMPING = 0.82
-const BOUNCE = 0.92
+export interface PhysicsOptions {
+  layoutId: GraphLayoutId
+  useTreeLayout?: boolean
+  /** Polar coords measured from canvas center (circular layout). */
+  polarFromCenter?: boolean
+}
+
+function nodeDepthOrder(nodes: SolarNode[]): SolarNode[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const depthOf = (n: SolarNode): number => {
+    if (!n.parentId) return 0
+    const p = byId.get(n.parentId)
+    return p ? depthOf(p) + 1 : 0
+  }
+  return [...nodes].sort((a, b) => depthOf(a) - depthOf(b))
+}
+
+function isTreeLayout(nodes: SolarNode[]) {
+  return nodes.some((n) => n.layer !== undefined)
+}
+
+/** Polar hub layout (personal radial only). */
+function resolvePolarLayout(
+  nodes: SolarNode[],
+  cx = 0,
+  cy = 0,
+  skipId?: string | null,
+  fromCenter = false,
+) {
+  for (const n of nodeDepthOrder(nodes)) {
+    if (n.layer !== undefined) continue
+
+    if (n.type === 'sun') {
+      n.targetX = cx
+      n.targetY = cy
+      if (n.id !== skipId) {
+        n.x = cx
+        n.y = cy
+      }
+      continue
+    }
+
+    if (n.id === skipId) continue
+
+    const parent = n.parentId ? nodes.find((p) => p.id === n.parentId) : null
+    const ox = fromCenter ? cx : parent ? parent.x : cx
+    const oy = fromCenter ? cy : parent ? parent.y : cy
+
+    n.targetX = ox + Math.cos(n.baseAngle) * n.baseDistance
+    n.targetY = oy + Math.sin(n.baseAngle) * n.baseDistance
+    n.x = n.targetX
+    n.y = n.targetY
+  }
+}
+
+function snapTreeNodes(nodes: SolarNode[], skipId?: string | null) {
+  for (const n of nodes) {
+    if (n.layer === undefined) continue
+    if (n.id === skipId) continue
+    n.targetX = n.x
+    n.targetY = n.y
+  }
+}
 
 export function useSolarPhysics() {
   const nodesRef = useRef<SolarNode[]>([])
   const edgesRef = useRef<SolarEdge[]>([])
   const dragRef = useRef<{ id: string; ox: number; oy: number } | null>(null)
+  const treeRef = useRef(false)
+  const polarFromCenterRef = useRef(false)
 
-  const init = useCallback((nodes: SolarNode[], edges: SolarEdge[]) => {
-    nodesRef.current = nodes.map((n) => ({
-      ...n,
-      vx: n.vx ?? 0,
-      vy: n.vy ?? 0,
-      targetX: n.x,
-      targetY: n.y,
-    }))
+  const init = useCallback((nodes: SolarNode[], edges: SolarEdge[], options?: PhysicsOptions) => {
+    treeRef.current = options?.useTreeLayout ?? isTreeLayout(nodes)
+    polarFromCenterRef.current = options?.polarFromCenter ?? false
+    nodesRef.current = nodes.map((n) => ({ ...n, vx: 0, vy: 0 }))
     edgesRef.current = edges
+
+    if (treeRef.current) {
+      snapTreeNodes(nodesRef.current)
+    } else {
+      resolvePolarLayout(nodesRef.current, 0, 0, null, polarFromCenterRef.current)
+    }
   }, [])
 
-  const computeTargets = useCallback((cx: number, cy: number, time: number) => {
+  const step = useCallback((cx: number, cy: number, _time: number) => {
     const nodes = nodesRef.current
+    const skipId = dragRef.current?.id ?? null
 
-    nodes.forEach((n) => {
-      if (n.type === 'sun') {
-        n.targetX = cx
-        n.targetY = cy
-        return
-      }
-
-      if (n.type === 'planet') {
-        const orbitSpeed = 0.015
-        const angle = n.baseAngle + time * orbitSpeed
-        const distance = n.baseDistance + Math.sin(time * 0.4 + n.baseAngle) * 6
-        n.targetX = cx + Math.cos(angle) * distance
-        n.targetY = cy + Math.sin(angle) * distance
-        n.depth = 0.55 + Math.sin(time * 0.3) * 0.08
-        return
-      }
-
-      if (n.type === 'moon' && n.parentId) {
-        const parent = nodes.find((p) => p.id === n.parentId)
-        if (!parent) return
-        const orbitSpeed = 0.12 + (n.baseAngle % 3) * 0.04
-        const angle = n.baseAngle + time * orbitSpeed
-        const wobble = Math.sin(time * 1.2 + n.baseAngle * 2) * 5
-        const distance = n.baseDistance + wobble
-        n.targetX = parent.x + Math.cos(angle) * distance
-        n.targetY = parent.y + Math.sin(angle) * distance
-        n.depth = 0.35 + 0.45 * ((Math.sin(angle) + 1) / 2)
-      }
-    })
-  }, [])
-
-  const step = useCallback((cx: number, cy: number, time: number) => {
-    const nodes = nodesRef.current
-    computeTargets(cx, cy, time)
-
-    for (const n of nodes) {
-      if (n.fixed) {
-        n.x = n.targetX
-        n.y = n.targetY
-        n.vx = 0
-        n.vy = 0
-        continue
-      }
-
-      if (dragRef.current?.id === n.id) continue
-
-      const dx = n.targetX - n.x
-      const dy = n.targetY - n.y
-      n.vx += dx * SPRING_K
-      n.vy += dy * SPRING_K
-      n.vx *= DAMPING
-      n.vy *= DAMPING
-
-      if (Math.hypot(dx, dy) < 2 && Math.hypot(n.vx, n.vy) < 0.5) {
-        n.x = n.targetX
-        n.y = n.targetY
-        n.vx *= BOUNCE * 0.3
-        n.vy *= BOUNCE * 0.3
-      } else {
-        n.x += n.vx
-        n.y += n.vy
-      }
+    if (treeRef.current) {
+      snapTreeNodes(nodes, skipId)
+    } else {
+      resolvePolarLayout(nodes, cx, cy, skipId, polarFromCenterRef.current)
     }
 
     return nodes
-  }, [computeTargets])
+  }, [])
 
   const startDrag = useCallback((id: string, gx: number, gy: number) => {
     const n = nodesRef.current.find((x) => x.id === id)
     if (!n || n.fixed) return false
     dragRef.current = { id, ox: gx - n.x, oy: gy - n.y }
-    n.vx = 0
-    n.vy = 0
     return true
   }, [])
 
@@ -133,25 +142,14 @@ export function useSolarPhysics() {
     const d = dragRef.current
     if (!d) return
     const n = nodesRef.current.find((x) => x.id === d.id)
-    if (n) {
-      const prevX = n.x
-      const prevY = n.y
-      n.x = gx - d.ox
-      n.y = gy - d.oy
-      n.vx = (n.x - prevX) * 0.6
-      n.vy = (n.y - prevY) * 0.6
-    }
+    if (!n) return
+    n.x = gx - d.ox
+    n.y = gy - d.oy
+    n.targetX = n.x
+    n.targetY = n.y
   }, [])
 
   const endDrag = useCallback(() => {
-    const d = dragRef.current
-    if (d) {
-      const n = nodesRef.current.find((x) => x.id === d.id)
-      if (n) {
-        n.vx *= 1.4
-        n.vy *= 1.4
-      }
-    }
     dragRef.current = null
   }, [])
 

@@ -18,5 +18,6 @@ export const DEMO_CREDENTIALS: Record<
 > = {
   'priya@acme.com': { password: 'pass', email: 'priya@acme.com' },
   'ramesh@acme.com': { password: 'pass', email: 'ramesh@acme.com' },
+  'leena@acme.com': { password: 'pass', email: 'leena@acme.com' },
   'divya@acme.com': { password: 'pass', email: 'divya@acme.com' },
 }

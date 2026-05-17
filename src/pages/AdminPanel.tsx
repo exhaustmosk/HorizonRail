@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { useOrgStore } from '../store/orgStore'
 import { useGoalStore } from '../store/goalStore'
-import { THRUST_AREAS } from '../lib/constants'
-import type { UoMType } from '../types'
 import Topbar from '../components/layout/Topbar'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
+import PushKpiPanel from '../components/goals/PushKpiPanel'
 
 type Tab = 'org' | 'kpi' | 'cycle' | 'audit'
 
@@ -14,16 +13,10 @@ export default function AdminPanel() {
   const employees = useOrgStore((s) => s.employees)
   const checkInPeriods = useOrgStore((s) => s.checkInPeriods)
   const updateCheckInPeriod = useOrgStore((s) => s.updateCheckInPeriod)
-  const pushKPI = useGoalStore((s) => s.pushKPI)
   const lockAllApproved = useGoalStore((s) => s.lockAllApproved)
   const unlockGoal = useGoalStore((s) => s.unlockGoal)
   const auditLog = useOrgStore((s) => s.getAuditLog)
 
-  const [kpiTitle, setKpiTitle] = useState('')
-  const [kpiThrust, setKpiThrust] = useState<string>(THRUST_AREAS[0])
-  const [kpiUom, setKpiUom] = useState<UoMType>('numeric_min')
-  const [kpiTarget, setKpiTarget] = useState('100')
-  const [selectedEmps, setSelectedEmps] = useState<string[]>([])
   const [unlockEmp, setUnlockEmp] = useState('')
   const [unlockGoalId, setUnlockGoalId] = useState('')
   const [unlockReason, setUnlockReason] = useState('')
@@ -89,78 +82,11 @@ export default function AdminPanel() {
         )}
 
         {tab === 'kpi' && (
-          <Card className="max-w-xl space-y-4">
-            <h3 className="font-heading font-bold">Push KPI to employees</h3>
-            <input
-              placeholder="Title"
-              value={kpiTitle}
-              onChange={(e) => setKpiTitle(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-subtle)] bg-bg-elevated px-3 py-2 text-sm"
-            />
-            <select
-              value={kpiThrust}
-              onChange={(e) => setKpiThrust(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-subtle)] bg-bg-elevated px-3 py-2 text-sm"
-            >
-              {THRUST_AREAS.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-            <select
-              value={kpiUom}
-              onChange={(e) => setKpiUom(e.target.value as UoMType)}
-              className="w-full rounded-lg border border-[var(--border-subtle)] bg-bg-elevated px-3 py-2 text-sm"
-            >
-              <option value="numeric_min">Numeric min</option>
-              <option value="numeric_max">Numeric max</option>
-              <option value="zero">Zero</option>
-            </select>
-            <input
-              type="number"
-              placeholder="Target"
-              value={kpiTarget}
-              onChange={(e) => setKpiTarget(e.target.value)}
-              className="w-full rounded-lg border border border-[var(--border-subtle)] bg-bg-elevated px-3 py-2 text-sm"
-            />
-            <div className="max-h-40 space-y-1 overflow-y-auto">
-              {empList.map((e) => (
-                <label key={e.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedEmps.includes(e.id)}
-                    onChange={(ev) =>
-                      setSelectedEmps((prev) =>
-                        ev.target.checked
-                          ? [...prev, e.id]
-                          : prev.filter((id) => id !== e.id),
-                      )
-                    }
-                  />
-                  {e.name}
-                </label>
-              ))}
-            </div>
-            <Button
-              onClick={() => {
-                pushKPI(
-                  {
-                    title: kpiTitle,
-                    thrustArea: kpiThrust,
-                    uom: kpiUom,
-                    target: Number(kpiTarget),
-                  },
-                  selectedEmps,
-                )
-                setKpiTitle('')
-                setSelectedEmps([])
-              }}
-              disabled={!kpiTitle || selectedEmps.length === 0}
-            >
-              Push KPI
-            </Button>
-          </Card>
+          <PushKpiPanel
+            eligibleEmployees={empList}
+            title="Push KPI to employees"
+            description="Select any employee in the organization to receive this KPI."
+          />
         )}
 
         {tab === 'cycle' && (

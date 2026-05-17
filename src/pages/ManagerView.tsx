@@ -7,6 +7,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import NeuronCanvas from '../components/neuron/NeuronCanvas'
 import CheckInPanel from '../components/checkin/CheckInPanel'
+import PushKpiPanel from '../components/goals/PushKpiPanel'
 
 export default function ManagerView() {
   const user = useAuthStore((s) => s.user)!
@@ -91,6 +92,14 @@ export default function ManagerView() {
             </p>
           </Card>
         </div>
+      </div>
+
+      <div className="px-6 pb-6">
+        <PushKpiPanel
+          eligibleEmployees={reports}
+          title="Push KPI to your team"
+          description="KPIs are assigned only to people who report directly to you."
+        />
       </div>
 
       {selectedForCheckIn && (
