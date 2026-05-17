@@ -18,7 +18,7 @@ export default function Profile() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="font-heading text-2xl font-bold">My Profile</h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Your AtomQuest account details
+            Your HorizonRail account details
           </p>
         </motion.div>
 

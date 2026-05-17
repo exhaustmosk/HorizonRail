@@ -521,7 +521,7 @@ export default function NeuronGraph(props: NeuronGraphProps) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `atomquest-graph-${storageId}.json`
+    a.download = `horizonrail-graph-${storageId}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -573,7 +573,7 @@ export default function NeuronGraph(props: NeuronGraphProps) {
     if (!canvas) return
     const a = document.createElement('a')
     a.href = canvas.toDataURL('image/png')
-    a.download = `atomquest-graph-${Date.now()}.png`
+    a.download = `horizonrail-graph-${Date.now()}.png`
     a.click()
   }
 

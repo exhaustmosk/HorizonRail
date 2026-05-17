@@ -10,10 +10,19 @@ export function computeScore(goal: Goal, actual: number): number {
       return Math.min((goal.target / actual) * 100, 150)
 
     case 'timeline': {
-      const today = new Date()
+      if (!actual) {
+        const today = new Date()
+        const deadline = new Date(goal.targetDate!)
+        const diffDays = Math.floor(
+          (today.getTime() - deadline.getTime()) / 86400000,
+        )
+        if (diffDays <= 0) return 100
+        return Math.max(0, 100 - diffDays * 5)
+      }
+      const completionDate = new Date(actual)
       const deadline = new Date(goal.targetDate!)
       const diffDays = Math.floor(
-        (today.getTime() - deadline.getTime()) / 86400000,
+        (completionDate.getTime() - deadline.getTime()) / 86400000,
       )
       if (diffDays <= 0) return 100
       return Math.max(0, 100 - diffDays * 5)

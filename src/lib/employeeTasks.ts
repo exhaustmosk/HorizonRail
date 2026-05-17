@@ -1,4 +1,6 @@
 import type { Employee, Goal } from '../types'
+import type { CheckInPeriod, CycleQuotaPolicy } from '../types'
+import { canLogAchievement, isCheckInQuarter, resolveActivePeriod } from './checkInSchedule'
 
 export interface EmployeeTask {
   id: string
@@ -9,8 +11,25 @@ export interface EmployeeTask {
   priority: 'high' | 'medium' | 'low'
 }
 
-export function buildEmployeeTasks(employee: Employee): EmployeeTask[] {
+export function buildEmployeeTasks(
+  employee: Employee,
+  periods: CheckInPeriod[] = [],
+  policy?: CycleQuotaPolicy,
+  now = new Date(),
+  forcedPeriodId?: import('../types').CyclePhaseId | null,
+): EmployeeTask[] {
   const tasks: EmployeeTask[] = []
+  const activePeriod = periods.length
+    ? resolveActivePeriod(periods, now, forcedPeriodId)
+    : undefined
+  const canCheckIn =
+    activePeriod && policy
+      ? canLogAchievement(activePeriod, policy, now)
+      : false
+  const activeQuarter =
+    activePeriod && isCheckInQuarter(activePeriod.quarter)
+      ? activePeriod.quarter
+      : null
 
   employee.goals.forEach((g: Goal) => {
     if (g.approvalStatus === 'draft') {
@@ -19,7 +38,7 @@ export function buildEmployeeTasks(employee: Employee): EmployeeTask[] {
         title: `Submit "${g.title}" for approval`,
         done: false,
         goalId: g.id,
-        dueLabel: 'This week',
+        dueLabel: activePeriod?.quarter === 'goal_setting' ? 'Goal setting window' : 'This week',
         priority: 'high',
       })
     }
@@ -32,18 +51,20 @@ export function buildEmployeeTasks(employee: Employee): EmployeeTask[] {
         priority: 'high',
       })
     }
-    const hasQ1 = g.quarterlyActuals.some((q) => q.quarter === 'Q1')
-    if (g.locked && !hasQ1) {
-      tasks.push({
-        id: `task-log-${g.id}`,
-        title: `Log Q1 actual for ${g.title}`,
-        done: false,
-        goalId: g.id,
-        dueLabel: 'Q1 check-in',
-        priority: 'medium',
-      })
+    if (activeQuarter && g.locked && canCheckIn) {
+      const hasQuarter = g.quarterlyActuals.some((q) => q.quarter === activeQuarter)
+      if (!hasQuarter) {
+        tasks.push({
+          id: `task-log-${g.id}-${activeQuarter}`,
+          title: `${activeQuarter} check-in: ${g.title}`,
+          done: false,
+          goalId: g.id,
+          dueLabel: `${activePeriod?.label ?? activeQuarter} · Planned vs actual`,
+          priority: 'high',
+        })
+      }
     }
-    if (g.weightage < 10) {
+    if (g.weightage < (policy?.minWeightagePerGoal ?? 10)) {
       tasks.push({
         id: `task-weight-${g.id}`,
         title: `Fix weightage on ${g.title}`,
@@ -55,11 +76,26 @@ export function buildEmployeeTasks(employee: Employee): EmployeeTask[] {
   })
 
   const totalWeight = employee.goals.reduce((s, g) => s + g.weightage, 0)
-  if (employee.goals.length > 0 && totalWeight !== 100) {
+  const required = policy?.totalWeightageRequired ?? 100
+  if (employee.goals.length > 0 && totalWeight !== required) {
     tasks.push({
       id: 'task-weight-total',
-      title: `Balance goal sheet to 100% (now ${totalWeight}%)`,
+      title: `Balance goal sheet to ${required}% (now ${totalWeight}%)`,
       done: false,
+      priority: 'high',
+    })
+  }
+
+  if (
+    activePeriod?.quarter === 'goal_setting' &&
+    policy?.goalSettingMandatory &&
+    employee.goals.length < (policy.minGoals ?? 1)
+  ) {
+    tasks.push({
+      id: 'task-min-goals',
+      title: `Add at least ${policy.minGoals} goals before window closes`,
+      done: false,
+      dueLabel: 'Phase 1 — Goal Setting',
       priority: 'high',
     })
   }

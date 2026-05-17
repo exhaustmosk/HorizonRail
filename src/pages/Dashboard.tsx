@@ -11,12 +11,22 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useOrgStore } from '../store/orgStore'
+import { useCycleStore } from '../store/cycleStore'
 import { useGoalStore } from '../store/goalStore'
+import { useLiveClock } from '../hooks/useLiveClock'
+import {
+  canLogAchievement,
+  formatCountdown,
+  isCheckInQuarter,
+  msUntil,
+  resolveActivePeriod,
+} from '../lib/checkInSchedule'
 import { computeWeightedScore, validateGoalSheet } from '../lib/scoreEngine'
 import { buildEmployeeTasks } from '../lib/employeeTasks'
 import Card from '../components/ui/Card'
 import GoalCard from '../components/goals/GoalCard'
 import CheckInCalendar from '../components/checkin/CheckInCalendar'
+import PeriodStatusBanner from '../components/checkin/PeriodStatusBanner'
 import Modal, { ModalActions } from '../components/ui/Modal'
 import Badge from '../components/ui/Badge'
 
@@ -24,22 +34,22 @@ export default function Dashboard() {
   const user = useAuthStore((s) => s.user)!
   const employees = useOrgStore((s) => s.employees)
   const checkInPeriods = useOrgStore((s) => s.checkInPeriods)
+  const forcedId = useCycleStore((s) => s.adminForcedPeriodId)
+  const policy = useCycleStore((s) => s.policy)
   const logActual = useGoalStore((s) => s.logActual)
+  const now = useLiveClock()
   const emp = employees.find((e) => e.id === user.id) ?? user
   const goals = emp.goals
-  const tasks = useMemo(() => buildEmployeeTasks(emp), [emp])
+  const tasks = useMemo(
+    () => buildEmployeeTasks(emp, checkInPeriods, policy, now, forcedId),
+    [emp, checkInPeriods, policy, now, forcedId],
+  )
   const weighted = Math.round(computeWeightedScore(goals))
   const totalWeight = goals.reduce((s, g) => s + g.weightage, 0)
   const sheetErrors = validateGoalSheet(goals)
-  const activePeriod = checkInPeriods.find((p) => p.isActive)
-  const daysLeft = activePeriod
-    ? Math.max(
-        0,
-        Math.ceil(
-          (activePeriod.closeDate.getTime() - Date.now()) / 86400000,
-        ),
-      )
-    : 0
+  const activePeriod = resolveActivePeriod(checkInPeriods, now, forcedId)
+  const closesIn = activePeriod ? msUntil(activePeriod.closeDate, now) : 0
+  const canLog = canLogAchievement(activePeriod, policy, now)
   const pendingTasks = tasks.filter((t) => !t.done)
   const doneTasks = tasks.filter((t) => t.done)
 
@@ -48,9 +58,12 @@ export default function Dashboard() {
   const [taskDone, setTaskDone] = useState<Record<string, boolean>>({})
 
   const handleLog = () => {
-    if (!logGoalId || !activePeriod?.quarter.startsWith('Q')) return
-    const q = activePeriod.quarter as 'Q1' | 'Q2' | 'Q3' | 'Q4'
-    logActual(user.id, logGoalId, q, Number(actualValue))
+    if (!logGoalId || !activePeriod || !isCheckInQuarter(activePeriod.quarter)) return
+    if (!canLog) return
+    const q = activePeriod.quarter
+    const g = goals.find((x) => x.id === logGoalId)
+    const val = g?.uom === 'timeline' ? (actualValue ? new Date(actualValue).getTime() : 0) : Number(actualValue)
+    logActual(user.id, logGoalId, q, val)
     setLogGoalId(null)
     setActualValue('')
   }
@@ -97,9 +110,9 @@ export default function Dashboard() {
               icon: Target,
             },
             {
-              label: 'Check-in closes',
-              value: `${daysLeft}d`,
-              accent: '',
+              label: activePeriod ? 'Window closes' : 'Next window',
+              value: activePeriod ? formatCountdown(closesIn) : '—',
+              accent: activePeriod ? 'text-accent-glow font-mono text-lg' : '',
               icon: Calendar,
             },
           ].map((m) => (
@@ -117,15 +130,19 @@ export default function Dashboard() {
           ))}
         </div>
 
+        <div className="mb-6">
+          <PeriodStatusBanner period={activePeriod} policy={policy} now={now} />
+        </div>
+
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
             {sheetErrors.length > 0 && (
-              <motion.div className="rounded-xl border border-accent-amber/40 bg-accent-amber/10 px-4 py-3 text-sm text-accent-amber">
+              <div className="rounded-xl border border-accent-amber/40 bg-accent-amber/10 px-4 py-3 text-sm text-accent-amber">
                 {sheetErrors[0]}
                 <Link to="/my-goals" className="ml-2 underline">
                   Fix in goal sheet
                 </Link>
-              </motion.div>
+              </div>
             )}
 
             <div>
@@ -143,7 +160,7 @@ export default function Dashboard() {
                   <GoalCard
                     key={goal.id}
                     goal={goal}
-                    checkInActive={!!activePeriod?.isActive}
+                    checkInActive={canLog}
                     onLogAchievement={() => setLogGoalId(goal.id)}
                   />
                 ))}
@@ -234,14 +251,25 @@ export default function Dashboard() {
       >
         <label className="block">
           <span className="text-xs text-[var(--text-secondary)]">
-            Actual value ({activePeriod?.quarter})
+            {goals.find((g) => g.id === logGoalId)?.uom === 'timeline'
+              ? 'Completion date'
+              : `Actual value (${activePeriod?.quarter})`}
           </span>
-          <input
-            type="number"
-            value={actualValue}
-            onChange={(e) => setActualValue(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-purple bg-bg-elevated px-3 py-2 text-sm"
-          />
+          {goals.find((g) => g.id === logGoalId)?.uom === 'timeline' ? (
+            <input
+              type="date"
+              value={actualValue}
+              onChange={(e) => setActualValue(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-purple bg-bg-elevated px-3 py-2 text-sm text-[var(--text-primary)]"
+            />
+          ) : (
+            <input
+              type="number"
+              value={actualValue}
+              onChange={(e) => setActualValue(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-purple bg-bg-elevated px-3 py-2 text-sm text-[var(--text-primary)]"
+            />
+          )}
         </label>
       </Modal>
     </div>

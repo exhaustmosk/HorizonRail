@@ -17,15 +17,21 @@ export default function AchievementReport({ employees }: AchievementReportProps)
       .filter((e) => e.role === 'employee')
       .filter((e) => department === 'all' || e.department === department)
       .flatMap((emp) =>
-        emp.goals.map((goal) => {
-          const getQ = (q: string) =>
-            goal.quarterlyActuals.find((a) => a.quarter === q)?.actual ?? ''
+         emp.goals.map((goal) => {
+          const getQ = (q: string) => {
+            const actual = goal.quarterlyActuals.find((a) => a.quarter === q)?.actual
+            if (actual === undefined || actual === null) return ''
+            if (goal.uom === 'timeline') {
+              return actual ? new Date(actual).toLocaleDateString() : ''
+            }
+            return actual
+          }
           return {
             employee: emp.name,
             department: emp.department,
             goal: goal.title,
             thrust: goal.thrustArea,
-            target: goal.target,
+            target: goal.uom === 'timeline' && goal.targetDate ? new Date(goal.targetDate).toLocaleDateString() : goal.target,
             Q1: getQ('Q1'),
             Q2: getQ('Q2'),
             Q3: getQ('Q3'),

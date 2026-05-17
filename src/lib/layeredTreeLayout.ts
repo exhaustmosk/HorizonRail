@@ -141,7 +141,6 @@ export function layoutCompanyTree(
   s = 1,
 ) {
   const lx = scaledLayer(s)
-  const branchPad = BRANCH_PAD * s
   const mgrBlockPad = MGR_BLOCK_PAD * s
   const sun = nodes.find((n) => n.id === 'sun')
   if (!sun) return

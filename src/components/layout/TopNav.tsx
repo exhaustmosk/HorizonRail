@@ -3,7 +3,7 @@ import { useThemeStore } from '../../store/themeStore'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { LogOut, ChevronDown, Menu, X, Sun, Moon, User } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
-import { COMPANY_NAME } from '../../lib/constants'
+import { PRODUCT_NAME } from '../../lib/constants'
 
 const employeeLinks = [
   { to: '/dashboard', label: 'Home' },
@@ -76,7 +76,7 @@ export default function TopNav() {
         >
           <BrandLogo />
           <span className="font-heading text-base font-semibold text-white light:text-slate-900">
-            {COMPANY_NAME}
+            {PRODUCT_NAME}
           </span>
         </Link>
 

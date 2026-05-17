@@ -98,8 +98,14 @@ export default function MyGoals() {
                 >
                   <td className="p-3">{g.thrustArea}</td>
                   <td className="p-3">{g.title}</td>
-                  <td className="p-3">{g.uom}</td>
-                  <td className="p-3">{g.target}</td>
+                  <td className="p-3 capitalize">{g.uom.replace('_', ' ')}</td>
+                  <td className="p-3">
+                    {g.uom === 'timeline'
+                      ? g.targetDate
+                        ? new Date(g.targetDate).toLocaleDateString()
+                        : '—'
+                      : g.target}
+                  </td>
                   <td className="p-3">
                     {!g.locked ? (
                       <input

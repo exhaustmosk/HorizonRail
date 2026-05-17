@@ -1,5 +1,9 @@
+import { useState } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useOrgStore } from '../store/orgStore'
+import { useCycleStore } from '../store/cycleStore'
+import { useLiveClock } from '../hooks/useLiveClock'
+import { resolveActivePeriod } from '../lib/checkInSchedule'
 import { computeWeightedScore } from '../lib/scoreEngine'
 import { COMPANY_NAME, FISCAL_YEAR } from '../lib/constants'
 import Topbar from '../components/layout/Topbar'
@@ -8,12 +12,22 @@ import Button from '../components/ui/Button'
 import NeuronCanvas from '../components/neuron/NeuronCanvas'
 import CheckInPanel from '../components/checkin/CheckInPanel'
 import PushKpiPanel from '../components/goals/PushKpiPanel'
+import PeriodStatusBanner from '../components/checkin/PeriodStatusBanner'
+import TeamCheckInTracker from '../components/checkin/TeamCheckInTracker'
+import CycleChangeRequestForm from '../components/checkin/CycleChangeRequestForm'
 
 export default function ManagerView() {
   const user = useAuthStore((s) => s.user)!
   const getDirectReports = useOrgStore((s) => s.getDirectReports)
   const employees = useOrgStore((s) => s.employees)
+  const checkInPeriods = useOrgStore((s) => s.checkInPeriods)
+  const forcedId = useCycleStore((s) => s.adminForcedPeriodId)
+  const policy = useCycleStore((s) => s.policy)
   const reports = getDirectReports(user.id)
+  const now = useLiveClock()
+  const activePeriod = resolveActivePeriod(checkInPeriods, now, forcedId)
+
+  const [selectedId, setSelectedId] = useState(reports[0]?.id ?? '')
 
   const avgScore =
     reports.length > 0
@@ -31,8 +45,13 @@ export default function ManagerView() {
     e.goals.some((g) => g.approvalStatus === 'submitted'),
   ).length
 
+  const activeQuarter = activePeriod?.quarter
   const checkInsDone = reports.filter((e) =>
-    e.goals.some((g) => g.quarterlyActuals.length > 0),
+    activeQuarter && ['Q1', 'Q2', 'Q3', 'Q4'].includes(activeQuarter)
+      ? e.goals.some((g) =>
+          g.quarterlyActuals.some((a) => a.quarter === activeQuarter),
+        )
+      : e.goals.some((g) => g.quarterlyActuals.length > 0),
   ).length
 
   const exportCsv = () => {
@@ -49,7 +68,8 @@ export default function ManagerView() {
     a.click()
   }
 
-  const selectedForCheckIn = reports[0]
+  const selectedForCheckIn =
+    employees.find((e) => e.id === selectedId) ?? reports[0]
 
   return (
     <>
@@ -61,6 +81,9 @@ export default function ManagerView() {
           </Button>
         }
       />
+      <div className="space-y-4 px-6 pt-4">
+        <PeriodStatusBanner period={activePeriod} policy={policy} now={now} />
+      </div>
       <div className="grid gap-6 p-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <div className="rounded-xl border border-[var(--border-subtle)] bg-bg-surface p-4">
@@ -86,12 +109,27 @@ export default function ManagerView() {
             </p>
           </Card>
           <Card>
-            <p className="text-xs text-[var(--text-secondary)]">Check-ins done</p>
+            <p className="text-xs text-[var(--text-secondary)]">
+              {activePeriod ? `${activePeriod.quarter} check-ins` : 'Check-ins done'}
+            </p>
             <p className="font-heading text-2xl font-bold">
               {checkInsDone}/{reports.length}
             </p>
           </Card>
         </div>
+      </div>
+
+      <div className="grid gap-6 px-6 pb-6 lg:grid-cols-2">
+        <div>
+          <h2 className="mb-3 font-heading font-bold">Team check-in progress</h2>
+          <TeamCheckInTracker reports={reports} period={activePeriod} />
+        </div>
+        <CycleChangeRequestForm
+          managerId={user.id}
+          managerName={user.name}
+          periods={checkInPeriods}
+          policy={policy}
+        />
       </div>
 
       <div className="px-6 pb-6">
@@ -104,10 +142,21 @@ export default function ManagerView() {
 
       {selectedForCheckIn && (
         <div className="px-6 pb-6">
-          <h2 className="mb-3 font-heading font-bold">
-            Check-in: {selectedForCheckIn.name}
-          </h2>
-          <CheckInPanel employee={employees.find((e) => e.id === selectedForCheckIn.id) ?? selectedForCheckIn} />
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-heading font-bold">Member check-in detail</h2>
+            <select
+              value={selectedId}
+              onChange={(e) => setSelectedId(e.target.value)}
+              className="rounded-lg border border-[var(--border-subtle)] bg-bg-elevated px-3 py-1.5 text-sm"
+            >
+              {reports.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <CheckInPanel employee={selectedForCheckIn} activeQuarter={activePeriod} />
         </div>
       )}
     </>

@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource/dm-sans": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
+    "@supabase/supabase-js": "^2.105.4",
     "autoprefixer": "^10.5.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.16.0",

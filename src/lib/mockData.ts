@@ -1,7 +1,20 @@
-import type { AuditEntry, CheckInPeriod, Employee, Goal } from '../types'
+import type {
+  AuditEntry,
+  CheckInPeriod,
+  CycleChangeRequest,
+  CycleQuotaPolicy,
+  Employee,
+  Goal,
+} from '../types'
+import { PHASE_TABLE } from './checkInSchedule'
 
-const q1 = (actual: number, status: Goal['quarterlyActuals'][0]['status']) => ({
+const q1 = (
+  actual: number,
+  status: Goal['quarterlyActuals'][0]['status'],
+  planned?: number,
+) => ({
   quarter: 'Q1' as const,
+  planned: planned ?? actual,
   actual,
   status,
   submittedAt: new Date('2025-06-15'),
@@ -282,41 +295,85 @@ export const MOCK_EMPLOYEES: Employee[] = [
   },
 ]
 
-export const MOCK_CHECK_IN_PERIODS: CheckInPeriod[] = [
+function periodDates(month: number, dayStart: number, closeMonth?: number, closeDay?: number) {
+  const year = month >= 5 ? 2026 : 2027
+  const closeYear = (closeMonth ?? month) >= 5 ? 2026 : 2027
+  return {
+    openDate: new Date(year, month - 1, dayStart),
+    closeDate: new Date(
+      closeYear,
+      (closeMonth ?? month) - 1,
+      closeDay ?? new Date(closeYear, month, 0).getDate(),
+    ),
+  }
+}
+
+export const MOCK_CHECK_IN_PERIODS: CheckInPeriod[] = PHASE_TABLE.map((phase) => {
+  const dates =
+    phase.id === 'goal_setting'
+      ? periodDates(5, 1, 5, 31)
+      : phase.id === 'Q1'
+        ? periodDates(7, 1, 7, 31)
+        : phase.id === 'Q2'
+          ? periodDates(10, 1, 10, 31)
+          : phase.id === 'Q3'
+            ? periodDates(1, 1, 1, 31)
+            : periodDates(3, 1, 4, 30)
+
+  return {
+    name: phase.label,
+    quarter: phase.id,
+    label: phase.label,
+    action: phase.action,
+    ...dates,
+    enforced: true,
+  }
+})
+
+export const MOCK_CYCLE_POLICY: CycleQuotaPolicy = {
+  maxGoals: 8,
+  minGoals: 3,
+  minWeightagePerGoal: 10,
+  totalWeightageRequired: 100,
+  checkInsMandatory: true,
+  goalSettingMandatory: true,
+  allowLateSubmissions: false,
+  lateSubmissionGraceDays: 5,
+}
+
+export const MOCK_CHANGE_REQUESTS: CycleChangeRequest[] = [
   {
-    name: 'Goal Setting',
-    quarter: 'goal_setting',
-    openDate: new Date('2025-04-01'),
-    closeDate: new Date('2025-04-30'),
-    isActive: false,
+    id: 'cr-1',
+    requestedById: 'mgr-ramesh',
+    requestedByName: 'Ramesh Kumar',
+    requestedAt: new Date('2026-05-10T11:20:00'),
+    status: 'pending',
+    reason:
+      'Two team members were on extended leave during the goal-setting window. We need five extra days so they can submit and get approvals without penalty.',
+    summary: 'Extend Phase 1 (Goal Setting) close date by 5 days',
+    targetPeriod: 'goal_setting',
+    periodPatch: {
+      closeDate: new Date('2026-06-05'),
+    },
   },
   {
-    name: 'Q1 Check-in',
-    quarter: 'Q1',
-    openDate: new Date('2025-05-01'),
-    closeDate: new Date('2025-06-30'),
-    isActive: true,
-  },
-  {
-    name: 'Q2 Check-in',
-    quarter: 'Q2',
-    openDate: new Date('2025-08-01'),
-    closeDate: new Date('2025-09-30'),
-    isActive: false,
-  },
-  {
-    name: 'Q3 Check-in',
-    quarter: 'Q3',
-    openDate: new Date('2025-11-01'),
-    closeDate: new Date('2025-12-15'),
-    isActive: false,
-  },
-  {
-    name: 'Q4 Check-in',
-    quarter: 'Q4',
-    openDate: new Date('2026-02-01'),
-    closeDate: new Date('2026-03-31'),
-    isActive: false,
+    id: 'cr-2',
+    requestedById: 'mgr-leena',
+    requestedByName: 'Leena Das',
+    requestedAt: new Date('2026-04-28T09:00:00'),
+    status: 'approved',
+    reason:
+      'Engineering squad runs a release freeze in early July; shifting Q1 check-in by one week avoids conflicting with the cutover.',
+    summary: 'Shift Q1 check-in window to open 7 July',
+    targetPeriod: 'Q1',
+    periodPatch: {
+      openDate: new Date('2026-07-08'),
+      closeDate: new Date('2026-08-07'),
+    },
+    reviewedById: 'adm-divya',
+    reviewedByName: 'Divya Rao',
+    reviewedAt: new Date('2026-04-29T15:30:00'),
+    reviewNote: 'Approved — aligned with release calendar.',
   },
 ]
 

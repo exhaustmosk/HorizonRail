@@ -1,19 +1,21 @@
 import { create } from 'zustand'
-import type { Goal, GoalStatus } from '../types'
+import { supabase } from '../lib/supabase'
+import type { CheckInComment, Goal, GoalStatus } from '../types'
 import { goalStatusFromScore, computeScore } from '../lib/scoreEngine'
 import { useOrgStore } from './orgStore'
 import { useAuthStore } from './authStore'
 
-function syncEmployeeGoals(employeeId: string, goals: Goal[]) {
-  const org = useOrgStore.getState()
-  const emp = org.getEmployeeById(employeeId)
-  if (!emp) return
-  org.updateEmployee(employeeId, { goals })
-}
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function audit(action: string, targetId: string, targetLabel: string, oldValue: string, newValue: string) {
+async function audit(
+  action: string,
+  targetId: string,
+  targetLabel: string,
+  oldValue: string,
+  newValue: string,
+) {
   const user = useAuthStore.getState().user
-  useOrgStore.getState().addAuditEntry({
+  await useOrgStore.getState().addAuditEntry({
     timestamp: new Date(),
     actorId: user?.id ?? 'system',
     actorName: user?.name ?? 'System',
@@ -25,160 +27,353 @@ function audit(action: string, targetId: string, targetLabel: string, oldValue: 
   })
 }
 
+// Re-fetch a single employee's goals from Supabase and sync to orgStore
+async function refreshEmployeeGoals(employeeId: string) {
+  const { data: goals } = await supabase
+    .from('goals')
+    .select('*, quarterly_actuals(*), checkin_comments(*)')
+    .eq('employee_id', employeeId)
+    .order('created_at', { ascending: true })
+
+  const mappedGoals: Goal[] = (goals ?? []).map((g) => ({
+    id: g.id as string,
+    employeeId: g.employee_id as string,
+    thrustArea: g.thrust_area as string,
+    title: g.title as string,
+    description: (g.description as string) ?? '',
+    uom: g.uom as Goal['uom'],
+    target: Number(g.target),
+    targetDate: g.target_date ? new Date(g.target_date as string) : undefined,
+    weightage: Number(g.weightage),
+    isAdminPushed: Boolean(g.is_admin_pushed),
+    approvalStatus: g.approval_status as Goal['approvalStatus'],
+    locked: Boolean(g.locked),
+    createdAt: new Date(g.created_at as string),
+    updatedAt: new Date(g.updated_at as string),
+    quarterlyActuals: ((g.quarterly_actuals as Record<string, unknown>[]) ?? []).map((qa) => {
+      const comment = ((g.checkin_comments as Record<string, unknown>[]) ?? []).find(
+        (c) => c.quarter === qa.quarter
+      )
+      return {
+        quarter: qa.quarter as 'Q1' | 'Q2' | 'Q3' | 'Q4',
+        planned: Number(qa.planned),
+        actual: Number(qa.actual),
+        status: qa.status as GoalStatus,
+        employeeNotes: (qa.employee_notes as string) ?? '',
+        managerComment: (qa.manager_comment as string) ?? '',
+        submittedAt: new Date(qa.submitted_at as string),
+        checkInComment: comment
+          ? {
+              summary: (comment.summary as string) ?? '',
+              strengths: (comment.strengths as string) ?? '',
+              blockers: (comment.blockers as string) ?? '',
+              nextSteps: (comment.next_steps as string) ?? '',
+              managerId: comment.manager_id as string,
+              managerName: comment.manager_name as string,
+              submittedAt: new Date(comment.submitted_at as string),
+            }
+          : undefined,
+      }
+    }),
+  }))
+
+  useOrgStore.getState().updateEmployee(employeeId, { goals: mappedGoals })
+  return mappedGoals
+}
+
+// ─── Store ────────────────────────────────────────────────────────────────────
+
 interface GoalStore {
   getGoalsForEmployee: (employeeId: string) => Goal[]
-  addGoal: (goal: Goal) => void
-  updateGoal: (employeeId: string, id: string, updates: Partial<Goal>) => void
-  deleteGoal: (employeeId: string, id: string) => void
-  logActual: (
+  addGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt' | 'quarterlyActuals'>) => Promise<void>
+  updateGoal: (employeeId: string, id: string, updates: Partial<Goal>) => Promise<void>
+  deleteGoal: (employeeId: string, id: string) => Promise<void>
+  logActual: (employeeId: string, goalId: string, quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4', actual: number) => Promise<void>
+  submitQuarterlyCheckIn: (
     employeeId: string,
     goalId: string,
     quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4',
-    actual: number,
-  ) => void
-  approveGoal: (employeeId: string, goalId: string) => void
-  rejectGoal: (employeeId: string, goalId: string, reason: string) => void
-  submitGoals: (employeeId: string) => void
-  pushKPI: (kpi: Partial<Goal>, employeeIds: string[]) => void
-  lockAllApproved: () => void
-  unlockGoal: (employeeId: string, goalId: string, reason: string) => void
+    data: { planned: number; actual: number; status: GoalStatus; employeeNotes?: string },
+  ) => Promise<void>
+  saveManagerCheckInComment: (
+    employeeId: string,
+    goalId: string,
+    quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4',
+    comment: Omit<CheckInComment, 'submittedAt'>,
+  ) => Promise<void>
+  approveGoal: (employeeId: string, goalId: string) => Promise<void>
+  rejectGoal: (employeeId: string, goalId: string, reason: string) => Promise<void>
+  submitGoals: (employeeId: string) => Promise<void>
+  pushKPI: (kpi: Partial<Goal>, employeeIds: string[]) => Promise<void>
+  lockAllApproved: () => Promise<void>
+  unlockGoal: (employeeId: string, goalId: string, reason: string) => Promise<void>
 }
 
 export const useGoalStore = create<GoalStore>(() => ({
-  getGoalsForEmployee: (employeeId) => {
-    return useOrgStore.getState().getEmployeeById(employeeId)?.goals ?? []
+  getGoalsForEmployee: (employeeId) =>
+    useOrgStore.getState().getEmployeeById(employeeId)?.goals ?? [],
+
+  addGoal: async (goal) => {
+    const user = useAuthStore.getState().user
+    const { data, error } = await supabase
+      .from('goals')
+      .insert({
+        employee_id: goal.employeeId,
+        org_id: user?.organizationId ?? null,
+        thrust_area: goal.thrustArea,
+        title: goal.title,
+        description: goal.description ?? '',
+        uom: goal.uom,
+        target: goal.target,
+        target_date: goal.targetDate?.toISOString() ?? null,
+        weightage: goal.weightage,
+        is_admin_pushed: goal.isAdminPushed ?? false,
+        approval_status: goal.isAdminPushed ? 'approved' : 'draft',
+        locked: goal.isAdminPushed ?? false,
+      })
+      .select()
+      .single()
+
+    if (error) throw new Error(error.message)
+
+    // Seed blank quarterly actuals for Q1-Q4
+    if (data) {
+      const actuals = ['Q1', 'Q2', 'Q3', 'Q4'].map((q) => ({
+        goal_id: data.id as string,
+        quarter: q,
+        planned: goal.target,
+        actual: 0,
+        status: 'not_started',
+        employee_notes: '',
+        manager_comment: '',
+      }))
+      await supabase.from('quarterly_actuals').insert(actuals)
+    }
+
+    await refreshEmployeeGoals(goal.employeeId)
+    await audit('GOAL_CREATED', data?.id ?? '', goal.title, '', 'draft')
   },
 
-  addGoal: (goal) => {
-    const goals = useGoalStore.getState().getGoalsForEmployee(goal.employeeId)
-    syncEmployeeGoals(goal.employeeId, [...goals, goal])
-    audit('GOAL_CREATED', goal.id, goal.title, '', 'created')
-  },
+  updateGoal: async (employeeId, id, updates) => {
+    const patch: Record<string, unknown> = {}
+    if (updates.thrustArea !== undefined) patch.thrust_area = updates.thrustArea
+    if (updates.title !== undefined) patch.title = updates.title
+    if (updates.description !== undefined) patch.description = updates.description
+    if (updates.uom !== undefined) patch.uom = updates.uom
+    if (updates.target !== undefined) patch.target = updates.target
+    if (updates.targetDate !== undefined) patch.target_date = updates.targetDate?.toISOString() ?? null
+    if (updates.weightage !== undefined) patch.weightage = updates.weightage
+    if (updates.approvalStatus !== undefined) patch.approval_status = updates.approvalStatus
+    if (updates.locked !== undefined) patch.locked = updates.locked
 
-  updateGoal: (employeeId, id, updates) => {
-    const goals = useGoalStore.getState().getGoalsForEmployee(employeeId)
-    const prev = goals.find((g) => g.id === id)
-    const next = goals.map((g) =>
-      g.id === id ? { ...g, ...updates, updatedAt: new Date() } : g,
-    )
-    syncEmployeeGoals(employeeId, next)
-    if (prev) {
-      audit('GOAL_UPDATED', id, prev.title, JSON.stringify(prev), JSON.stringify(updates))
+    const { error } = await supabase.from('goals').update(patch).eq('id', id)
+    if (error) throw new Error(error.message)
+
+    await refreshEmployeeGoals(employeeId)
+
+    if (updates.approvalStatus) {
+      const goal = useOrgStore.getState().getEmployeeById(employeeId)?.goals.find((g) => g.id === id)
+      await audit(
+        updates.approvalStatus === 'approved'
+          ? 'GOAL_APPROVED'
+          : updates.approvalStatus === 'rejected'
+          ? 'GOAL_REJECTED'
+          : updates.approvalStatus === 'submitted'
+          ? 'GOAL_SUBMITTED'
+          : 'GOAL_UPDATED',
+        id,
+        goal?.title ?? id,
+        '',
+        updates.approvalStatus,
+      )
     }
   },
 
-  deleteGoal: (employeeId, id) => {
-    const goals = useGoalStore.getState().getGoalsForEmployee(employeeId)
-    const prev = goals.find((g) => g.id === id)
-    syncEmployeeGoals(
-      employeeId,
-      goals.filter((g) => g.id !== id),
-    )
-    if (prev) audit('GOAL_DELETED', id, prev.title, prev.title, '')
+  deleteGoal: async (employeeId, id) => {
+    const goal = useOrgStore.getState().getEmployeeById(employeeId)?.goals.find((g) => g.id === id)
+    await supabase.from('goals').delete().eq('id', id)
+    await refreshEmployeeGoals(employeeId)
+    await audit('GOAL_DELETED', id, goal?.title ?? id, goal?.title ?? '', '')
   },
 
-  logActual: (employeeId, goalId, quarter, actual) => {
-    const goals = useGoalStore.getState().getGoalsForEmployee(employeeId)
+  logActual: async (employeeId, goalId, quarter, actual) => {
+    const goals = useOrgStore.getState().getEmployeeById(employeeId)?.goals ?? []
     const goal = goals.find((g) => g.id === goalId)
     if (!goal) return
 
     const score = computeScore(goal, actual)
     const status: GoalStatus = goalStatusFromScore(score)
-    const existing = goal.quarterlyActuals.filter((q) => q.quarter !== quarter)
-    const updated: Goal = {
-      ...goal,
-      quarterlyActuals: [
-        ...existing,
-        { quarter, actual, status, submittedAt: new Date() },
-      ],
-      updatedAt: new Date(),
+
+    await supabase.from('quarterly_actuals').upsert(
+      {
+        goal_id: goalId,
+        quarter,
+        planned: actual,
+        actual,
+        status,
+        employee_notes: '',
+        manager_comment: '',
+      },
+      { onConflict: 'goal_id,quarter' }
+    )
+
+    await refreshEmployeeGoals(employeeId)
+    await audit('ACTUAL_LOGGED', goalId, `${quarter} actual`, '0', String(actual))
+  },
+
+  submitQuarterlyCheckIn: async (employeeId, goalId, quarter, data) => {
+    await supabase.from('quarterly_actuals').upsert(
+      {
+        goal_id: goalId,
+        quarter,
+        planned: data.planned,
+        actual: data.actual,
+        status: data.status,
+        employee_notes: data.employeeNotes ?? '',
+      },
+      { onConflict: 'goal_id,quarter' }
+    )
+
+    await refreshEmployeeGoals(employeeId)
+    const goal = useOrgStore.getState().getEmployeeById(employeeId)?.goals.find((g) => g.id === goalId)
+    await audit('QUARTERLY_CHECKIN', goalId, goal?.title ?? goalId, `${quarter} planned`, `${data.actual} (${data.status})`)
+  },
+
+  saveManagerCheckInComment: async (employeeId, goalId, quarter, comment) => {
+    // Update manager_comment on quarterly_actuals
+    await supabase
+      .from('quarterly_actuals')
+      .update({ manager_comment: comment.summary })
+      .eq('goal_id', goalId)
+      .eq('quarter', quarter)
+
+    // Upsert structured comment in checkin_comments
+    await supabase.from('checkin_comments').upsert(
+      {
+        goal_id: goalId,
+        quarter,
+        summary: comment.summary,
+        strengths: comment.strengths ?? '',
+        blockers: comment.blockers ?? '',
+        next_steps: comment.nextSteps ?? '',
+        manager_id: comment.managerId,
+        manager_name: comment.managerName,
+      },
+      { onConflict: 'goal_id,quarter' }
+    )
+
+    await refreshEmployeeGoals(employeeId)
+    const goal = useOrgStore.getState().getEmployeeById(employeeId)?.goals.find((g) => g.id === goalId)
+    await audit('CHECKIN_COMMENT', goalId, goal?.title ?? goalId, quarter, comment.summary.slice(0, 80))
+  },
+
+  approveGoal: async (employeeId, goalId) => {
+    await supabase
+      .from('goals')
+      .update({ approval_status: 'approved', locked: true })
+      .eq('id', goalId)
+
+    await refreshEmployeeGoals(employeeId)
+    const goal = useOrgStore.getState().getEmployeeById(employeeId)?.goals.find((g) => g.id === goalId)
+    await audit('GOAL_APPROVED', goalId, goal?.title ?? goalId, 'submitted', 'approved')
+  },
+
+  rejectGoal: async (employeeId, goalId, reason) => {
+    await supabase
+      .from('goals')
+      .update({ approval_status: 'rejected', locked: false })
+      .eq('id', goalId)
+
+    await refreshEmployeeGoals(employeeId)
+    const goal = useOrgStore.getState().getEmployeeById(employeeId)?.goals.find((g) => g.id === goalId)
+    await audit('GOAL_REJECTED', goalId, goal?.title ?? goalId, 'submitted', reason)
+  },
+
+  submitGoals: async (employeeId) => {
+    const goals = useOrgStore.getState().getEmployeeById(employeeId)?.goals ?? []
+    const draftGoals = goals.filter((g) => g.approvalStatus === 'draft')
+
+    for (const g of draftGoals) {
+      await supabase
+        .from('goals')
+        .update({ approval_status: 'submitted' })
+        .eq('id', g.id)
     }
-    useGoalStore.getState().updateGoal(employeeId, goalId, {
-      quarterlyActuals: updated.quarterlyActuals,
-    })
-    audit('ACTUAL_LOGGED', goalId, `${quarter} actual`, '0', String(actual))
+
+    await refreshEmployeeGoals(employeeId)
+    await audit('GOALS_SUBMITTED', employeeId, 'Goal sheet', 'draft', 'submitted')
   },
 
-  approveGoal: (employeeId, goalId) => {
-    useGoalStore.getState().updateGoal(employeeId, goalId, {
-      approvalStatus: 'approved',
-      locked: true,
-    })
-    const goal = useGoalStore.getState().getGoalsForEmployee(employeeId).find((g) => g.id === goalId)
-    if (goal) audit('GOAL_APPROVED', goalId, goal.title, 'submitted', 'approved')
-  },
-
-  rejectGoal: (employeeId, goalId, reason) => {
-    useGoalStore.getState().updateGoal(employeeId, goalId, {
-      approvalStatus: 'rejected',
-      locked: false,
-    })
-    const goal = useGoalStore.getState().getGoalsForEmployee(employeeId).find((g) => g.id === goalId)
-    if (goal) audit('GOAL_REJECTED', goalId, goal.title, 'submitted', reason)
-  },
-
-  submitGoals: (employeeId) => {
-    const goals = useGoalStore.getState().getGoalsForEmployee(employeeId)
-    const next = goals.map((g) => ({
-      ...g,
-      approvalStatus: 'submitted' as const,
-      updatedAt: new Date(),
-    }))
-    syncEmployeeGoals(employeeId, next)
-    audit('GOALS_SUBMITTED', employeeId, 'Goal sheet', 'draft', 'submitted')
-  },
-
-  pushKPI: (kpi, employeeIds) => {
+  pushKPI: async (kpi, employeeIds) => {
     const user = useAuthStore.getState().user
     let ids = employeeIds
 
     if (user?.role === 'manager') {
       const allowed = new Set(
-        useOrgStore
-          .getState()
-          .getDirectReports(user.id)
-          .map((e) => e.id),
+        useOrgStore.getState().getDirectReports(user.id).map((e) => e.id),
       )
       ids = employeeIds.filter((id) => allowed.has(id))
       if (ids.length === 0) return
     }
 
-    ids.forEach((empId) => {
-      const goal: Goal = {
-        id: `g-push-${empId}-${Date.now()}`,
-        employeeId: empId,
-        thrustArea: kpi.thrustArea ?? 'Operational Excellence',
-        title: kpi.title ?? 'Admin KPI',
-        description: kpi.description ?? '',
-        uom: kpi.uom ?? 'numeric_min',
-        target: kpi.target ?? 0,
-        targetDate: kpi.targetDate,
-        weightage: 10,
-        isAdminPushed: true,
-        approvalStatus: 'draft',
-        locked: false,
-        quarterlyActuals: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
+    for (const empId of ids) {
+      const emp = useOrgStore.getState().getEmployeeById(empId)
+      if (!emp) continue
+
+      const { data: newGoal } = await supabase
+        .from('goals')
+        .insert({
+          employee_id: empId,
+          org_id: user?.organizationId ?? null,
+          thrust_area: kpi.thrustArea ?? 'Operational Excellence',
+          title: kpi.title ?? 'Admin KPI',
+          description: kpi.description ?? '',
+          uom: kpi.uom ?? 'numeric_min',
+          target: kpi.target ?? 0,
+          target_date: kpi.targetDate?.toISOString() ?? null,
+          weightage: 10,
+          is_admin_pushed: true,
+          approval_status: 'approved',
+          locked: true,
+        })
+        .select()
+        .single()
+
+      if (newGoal) {
+        const actuals = ['Q1', 'Q2', 'Q3', 'Q4'].map((q) => ({
+          goal_id: newGoal.id as string,
+          quarter: q,
+          planned: kpi.target ?? 0,
+          actual: 0,
+          status: 'not_started',
+          employee_notes: '',
+          manager_comment: '',
+        }))
+        await supabase.from('quarterly_actuals').insert(actuals)
+        await refreshEmployeeGoals(empId)
       }
-      useGoalStore.getState().addGoal(goal)
-    })
-    audit('KPI_PUSHED', kpi.title ?? 'KPI', kpi.title ?? '', '', `${ids.length} employees`)
+    }
+
+    await audit('KPI_PUSHED', kpi.title ?? 'KPI', kpi.title ?? '', '', `${ids.length} employees`)
   },
 
-  lockAllApproved: () => {
-    const org = useOrgStore.getState()
-    org.employees.forEach((emp) => {
-      const next = emp.goals.map((g) =>
-        g.approvalStatus === 'approved' ? { ...g, locked: true } : g,
-      )
-      org.updateEmployee(emp.id, { goals: next })
-    })
-    audit('LOCK_ALL', 'all', 'Approved goals', '', 'locked')
+  lockAllApproved: async () => {
+    const user = useAuthStore.getState().user
+    if (!user?.organizationId) return
+
+    await supabase
+      .from('goals')
+      .update({ locked: true })
+      .eq('org_id', user.organizationId)
+      .eq('approval_status', 'approved')
+
+    await useOrgStore.getState().fetchAll()
+    await audit('LOCK_ALL', 'all', 'Approved goals', '', 'locked')
   },
 
-  unlockGoal: (employeeId, goalId, reason) => {
-    useGoalStore.getState().updateGoal(employeeId, goalId, { locked: false })
-    audit('GOAL_UNLOCKED', goalId, reason, 'locked', 'unlocked')
+  unlockGoal: async (employeeId, goalId, reason) => {
+    await supabase.from('goals').update({ locked: false }).eq('id', goalId)
+    await refreshEmployeeGoals(employeeId)
+    await audit('GOAL_UNLOCKED', goalId, reason, 'locked', 'unlocked')
   },
 }))

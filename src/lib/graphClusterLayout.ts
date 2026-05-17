@@ -85,27 +85,34 @@ function orientEmployeeHubsCircular(
   hubRing: number,
   leafRing: number,
 ) {
-  const goalsHub = nodes.find((n) => n.id === `goals-hub-${empId}`)
-  const tasksHub = nodes.find((n) => n.id === `tasks-hub-${empId}`)
+  const goalsHub = nodes.find((n) => n.parentId === empId && (n.meta as NodeMeta)?.kind === 'hub' && (n.meta as any).hub === 'goals')
+  const tasksHub = nodes.find((n) => n.parentId === empId && (n.meta as NodeMeta)?.kind === 'hub' && (n.meta as any).hub === 'tasks')
+  
+  const hubOffset = 35 / Math.max(hubRing, 1)
+
   if (goalsHub) {
-    goalsHub.baseAngle = facing - 0.55
+    goalsHub.baseAngle = facing - hubOffset
     goalsHub.baseDistance = hubRing
+    const leaves = nodes.filter((n) => n.parentId === goalsHub.id && n.isLeaf)
+    const spread = Math.max(0, (leaves.length - 1) * (28 / Math.max(leafRing, 1)))
     ringLeaves(
-      nodes.filter((n) => n.parentId === goalsHub.id && n.isLeaf),
-      facing - 0.55,
-      facing - 1.05,
-      facing - 0.05,
+      leaves,
+      goalsHub.baseAngle,
+      goalsHub.baseAngle - spread / 2,
+      goalsHub.baseAngle + spread / 2,
       leafRing,
     )
   }
   if (tasksHub) {
-    tasksHub.baseAngle = facing + 0.55
+    tasksHub.baseAngle = facing + hubOffset
     tasksHub.baseDistance = hubRing
+    const leaves = nodes.filter((n) => n.parentId === tasksHub.id && n.isLeaf)
+    const spread = Math.max(0, (leaves.length - 1) * (28 / Math.max(leafRing, 1)))
     ringLeaves(
-      nodes.filter((n) => n.parentId === tasksHub.id && n.isLeaf),
-      facing + 0.55,
-      facing + 0.05,
-      facing + 1.05,
+      leaves,
+      tasksHub.baseAngle,
+      tasksHub.baseAngle - spread / 2,
+      tasksHub.baseAngle + spread / 2,
       leafRing,
     )
   }

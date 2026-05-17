@@ -7,18 +7,21 @@ import {
   Shield,
   FileText,
   LogOut,
+  CalendarClock,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
-import { COMPANY_NAME } from '../../lib/constants'
+import { PRODUCT_NAME } from '../../lib/constants'
 
 const employeeLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/my-goals', label: 'My Goals', icon: Target },
+  { to: '/check-ins', label: 'Check-ins', icon: CalendarClock },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
 ]
 
 const managerLinks = [
   { to: '/manager', label: 'Team Overview', icon: Users },
+  { to: '/check-ins', label: 'Check-ins', icon: CalendarClock },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
 ]
 
@@ -43,10 +46,10 @@ export default function Sidebar() {
     <aside className="flex h-screen w-56 flex-col border-r border-[var(--border-subtle)] bg-bg-surface">
       <div className="border-b border-[var(--border-subtle)] p-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-violet font-heading text-sm font-bold">
-          AQ
+          HR
         </div>
-        <p className="mt-2 font-heading text-sm font-bold">{COMPANY_NAME}</p>
-        <p className="text-xs text-[var(--text-secondary)]">Goal Portal</p>
+        <p className="mt-2 font-heading text-sm font-bold">{PRODUCT_NAME}</p>
+        <p className="text-xs text-[var(--text-secondary)]">Performance rail</p>
       </div>
 
       <nav className="flex-1 space-y-1 p-3">

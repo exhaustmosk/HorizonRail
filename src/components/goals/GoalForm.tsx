@@ -108,16 +108,47 @@ export default function GoalForm({
           <div className="mt-2 flex flex-wrap gap-3">
             {(['numeric_min', 'numeric_max', 'timeline', 'zero'] as UoMType[]).map(
               (u) => (
-                <label key={u} className="flex items-center gap-1 text-sm">
+                <label key={u} className="flex items-center gap-1 text-sm cursor-pointer">
                   <input
                     type="radio"
                     checked={uom === u}
                     onChange={() => setUom(u)}
                     disabled={locked}
                   />
-                  {u.replace('_', ' ')}
+                  <span className="capitalize">{u.replace('_', ' ')}</span>
                 </label>
               ),
+            )}
+          </div>
+
+          <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-bg-surface/50 p-2.5 text-xs text-[var(--text-secondary)] space-y-1">
+            {uom === 'numeric_min' && (
+              <>
+                <p className="font-semibold text-[var(--text-primary)]">Min (Numeric / %)</p>
+                <p>Description: Higher is better — e.g., Sales Revenue</p>
+                <p className="font-mono text-accent-violet">Formula: Achievement ÷ Target</p>
+              </>
+            )}
+            {uom === 'numeric_max' && (
+              <>
+                <p className="font-semibold text-[var(--text-primary)]">Max (Numeric / %)</p>
+                <p>Description: Lower is better — e.g., TAT, Cost</p>
+                <p className="font-mono text-accent-violet">Formula: Target ÷ Achievement</p>
+              </>
+            )}
+            {uom === 'timeline' && (
+              <>
+                <p className="font-semibold text-[var(--text-primary)]">Timeline</p>
+                <p>Description: Date-based completion</p>
+                <p className="font-mono text-accent-violet">Formula: Completion date vs. Deadline</p>
+              </>
+            )}
+            {uom === 'zero' && (
+              <>
+                <p className="font-semibold text-[var(--text-primary)]">Zero</p>
+                <p>Description: Zero = Success — e.g., Safety incidents</p>
+                <p className="font-mono text-accent-violet">Formula: If 0 → 100%, else 0%</p>
+              </>
             )}
           </div>
         </fieldset>
