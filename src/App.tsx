@@ -17,6 +17,8 @@ import Analysis from './pages/Analysis'
 import Profile from './pages/Profile'
 import CheckIns from './pages/CheckIns'
 import Onboarding from './pages/Onboarding'
+import SelectManager from './pages/SelectManager'
+import ManagerGoalSheet from './pages/ManagerGoalSheet'
 import Policy from './pages/legal/Policy'
 import Terms from './pages/legal/Terms'
 import AcceptableUse from './pages/legal/AcceptableUse'
@@ -79,11 +81,13 @@ export default function App() {
         <Route path="/cookies" element={<Cookies />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/select-manager" element={<SelectManager />} />
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/my-goals" element={<MyGoals />} />
             <Route path="/check-ins" element={<CheckIns />} />
             <Route path="/manager" element={<ManagerView />} />
+            <Route path="/manager/goals" element={<ManagerGoalSheet />} />
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/analysis" element={<Analysis />} />
             <Route path="/profile" element={<Profile />} />

@@ -4,6 +4,7 @@ import type { CheckInComment, Goal, GoalStatus } from '../types'
 import { goalStatusFromScore, computeScore } from '../lib/scoreEngine'
 import { useOrgStore } from './orgStore'
 import { useAuthStore } from './authStore'
+import { notifyGoalSubmitted, notifyGoalApproved, notifyGoalRejected } from '../lib/notificationService'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -276,6 +277,15 @@ export const useGoalStore = create<GoalStore>(() => ({
     await refreshEmployeeGoals(employeeId)
     const goal = useOrgStore.getState().getEmployeeById(employeeId)?.goals.find((g) => g.id === goalId)
     await audit('GOAL_APPROVED', goalId, goal?.title ?? goalId, 'submitted', 'approved')
+
+    // Notify employee their goal was approved
+    try {
+      const emp = useOrgStore.getState().getEmployeeById(employeeId)
+      const manager = useAuthStore.getState().user
+      if (emp && manager && goal) {
+        notifyGoalApproved(emp.id, emp.email, emp.name, goal.title, manager.name, emp.organizationId)
+      }
+    } catch { /* notification failure should not break the flow */ }
   },
 
   rejectGoal: async (employeeId, goalId, reason) => {
@@ -287,6 +297,15 @@ export const useGoalStore = create<GoalStore>(() => ({
     await refreshEmployeeGoals(employeeId)
     const goal = useOrgStore.getState().getEmployeeById(employeeId)?.goals.find((g) => g.id === goalId)
     await audit('GOAL_REJECTED', goalId, goal?.title ?? goalId, 'submitted', reason)
+
+    // Notify employee their goal was returned for rework
+    try {
+      const emp = useOrgStore.getState().getEmployeeById(employeeId)
+      const manager = useAuthStore.getState().user
+      if (emp && manager && goal) {
+        notifyGoalRejected(emp.id, emp.email, emp.name, goal.title, manager.name, reason, emp.organizationId)
+      }
+    } catch { /* notification failure should not break the flow */ }
   },
 
   submitGoals: async (employeeId) => {
@@ -302,6 +321,17 @@ export const useGoalStore = create<GoalStore>(() => ({
 
     await refreshEmployeeGoals(employeeId)
     await audit('GOALS_SUBMITTED', employeeId, 'Goal sheet', 'draft', 'submitted')
+
+    // Notify the manager that goals were submitted
+    try {
+      const emp = useOrgStore.getState().getEmployeeById(employeeId)
+      if (emp?.managerId) {
+        const mgr = useOrgStore.getState().getEmployeeById(emp.managerId)
+        if (mgr) {
+          notifyGoalSubmitted(emp.name, emp.email, mgr.id, mgr.email, mgr.name, draftGoals.length, emp.organizationId)
+        }
+      }
+    } catch { /* notification failure should not break the flow */ }
   },
 
   pushKPI: async (kpi, employeeIds) => {

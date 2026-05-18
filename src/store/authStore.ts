@@ -22,6 +22,7 @@ interface AuthStore {
   logout: () => Promise<void>
   initialize: () => Promise<void>
   setUser: (user: Employee | null) => void
+  demoEntraIdLogin: () => Promise<{ error: string | null }>
 }
 
 // Converts Supabase profile DB row → frontend Employee shape
@@ -156,6 +157,62 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     return { error: null }
   },
 
+  demoEntraIdLogin: async () => {
+    // 1. Simulate network delay and OAuth redirect for the demo
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    const demoEmail = 'alex.entra@acme.com'
+    const demoPass = 'password123'
+    
+    // 2. Try to log in first
+    let { data: sessionData, error } = await supabase.auth.signInWithPassword({ email: demoEmail, password: demoPass })
+    
+    // 3. If user doesn't exist, register them
+    if (error && error.message.includes('Invalid login credentials')) {
+      const { data: regData, error: regError } = await supabase.auth.signUp({
+        email: demoEmail,
+        password: demoPass,
+        options: { data: { name: 'Alex Entra', role: 'employee', department: 'Engineering' } },
+      })
+      if (regError) return { error: regError.message }
+      sessionData = regData
+    } else if (error) {
+      return { error: error.message }
+    }
+
+    if (!sessionData?.user) return { error: 'OAuth simulation failed' }
+
+    // 4. MOCK GRAPH API SYNC: Find an org and a manager to auto-assign
+    const { data: orgs } = await supabase.from('organizations').select('id, name').limit(1)
+    if (orgs && orgs.length > 0) {
+      const org = orgs[0]
+      // Find a manager in this org
+      const { data: managers } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .eq('org_id', org.id)
+        .eq('role', 'manager')
+        .limit(1)
+
+      const manager = managers?.[0]
+
+      // Auto-sync profile with simulated Azure AD attributes
+      await supabase
+        .from('profiles')
+        .update({
+          org_id: org.id,
+          org_name: org.name,
+          org_status: 'joined', // Auto-join (bypasses requests)
+          manager_id: manager?.id ?? null, // Auto-assign manager (bypasses manual selection)
+          role: 'employee',
+          department: 'Engineering (Azure Synced)'
+        })
+        .eq('id', sessionData.user.id)
+    }
+
+    return { error: null }
+  },
+
   register: async (name, email, password, role, department, orgName, industry, size) => {
     // 1. Sign up with Supabase Auth — passes metadata that the DB trigger uses
     const { data, error } = await supabase.auth.signUp({
@@ -228,8 +285,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   logout: async () => {
-    await supabase.auth.signOut()
-    set({ user: null })
+    try {
+      await supabase.auth.signOut()
+    } catch (e) {
+      console.warn('Backend signout failed:', e)
+    } finally {
+      set({ user: null })
+      // Force a full reload to instantly clear all other Zustand stores from memory
+      window.location.href = '/'
+    }
   },
 }))
 

@@ -14,6 +14,7 @@ const employeeLinks = [
 
 const managerLinks = [
   { to: '/manager', label: 'Team' },
+  { to: '/manager/goals', label: 'Goal Sheet' },
   { to: '/analysis', label: 'Analysis' },
   { to: '/reports', label: 'Reports' },
 ]

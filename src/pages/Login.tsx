@@ -27,7 +27,10 @@ export default function Login() {
   const [error, setError] = useState('')
   const login = useAuthStore((s) => s.login)
   const register = useAuthStore((s) => s.register)
+  const demoEntraIdLogin = useAuthStore((s) => s.demoEntraIdLogin)
   const navigate = useNavigate()
+  
+  const [isSsoLoading, setIsSsoLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,6 +105,22 @@ export default function Login() {
         navigate('/onboarding')
       }
     }
+  }
+
+  const handleMicrosoftSSO = async () => {
+    setError('')
+    setIsSsoLoading(true)
+    const { error: ssoError } = await demoEntraIdLogin()
+    
+    if (ssoError) {
+      setError(ssoError)
+      setIsSsoLoading(false)
+      return
+    }
+
+    // Since we auto-joined the org and auto-assigned a manager in the demo,
+    // they bypass the onboarding screens completely.
+    navigate('/dashboard')
   }
 
   const tabHint =
@@ -347,6 +366,37 @@ export default function Login() {
               {mode === 'login' ? 'Sign in' : 'Create Account'}
             </button>
           </form>
+
+          <div className="relative mt-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-purple-strong/30"></div>
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-bg-card px-2 text-[var(--text-muted)] uppercase tracking-wider">Or continue with</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleMicrosoftSSO}
+            disabled={isSsoLoading}
+            className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-[#12101f] py-3.5 text-sm font-semibold text-white transition-all hover:bg-white/5 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isSsoLoading ? (
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 0H0V10H10V0Z" fill="#F25022"/>
+                <path d="M21 0H11V10H21V0Z" fill="#7FBA00"/>
+                <path d="M10 11H0V21H10V11Z" fill="#00A4EF"/>
+                <path d="M21 11H11V21H21V11Z" fill="#FFB900"/>
+              </svg>
+            )}
+            {isSsoLoading ? 'Connecting to Microsoft...' : 'Sign in with Microsoft'}
+          </button>
 
           {/* Toggle Login/Signup */}
           <div className="mt-6 text-center text-sm">

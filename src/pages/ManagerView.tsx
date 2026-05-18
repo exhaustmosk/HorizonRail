@@ -15,6 +15,7 @@ import PushKpiPanel from '../components/goals/PushKpiPanel'
 import PeriodStatusBanner from '../components/checkin/PeriodStatusBanner'
 import TeamCheckInTracker from '../components/checkin/TeamCheckInTracker'
 import CycleChangeRequestForm from '../components/checkin/CycleChangeRequestForm'
+import { UserPlus, Check, X as XIcon } from 'lucide-react'
 
 export default function ManagerView() {
   const user = useAuthStore((s) => s.user)!
@@ -26,6 +27,11 @@ export default function ManagerView() {
   const reports = getDirectReports(user.id)
   const now = useLiveClock()
   const activePeriod = resolveActivePeriod(checkInPeriods, now, forcedId)
+
+  const org = useOrgStore((s) => s.organizations.find((o) => o.id === user.organizationId))
+  const pendingRequests = org?.joinRequests.filter((r) => r.managerId === user.id) ?? []
+  const approveRequest = useOrgStore((s) => s.approveJoinRequest)
+  const denyRequest = useOrgStore((s) => s.denyJoinRequest)
 
   const [selectedId, setSelectedId] = useState(reports[0]?.id ?? '')
 
@@ -83,6 +89,42 @@ export default function ManagerView() {
       />
       <div className="space-y-4 px-6 pt-4">
         <PeriodStatusBanner period={activePeriod} policy={policy} now={now} />
+
+        {pendingRequests.length > 0 && (
+          <div className="rounded-xl border border-accent-violet/30 bg-accent-violet/5 p-4 shadow-[0_0_15px_rgba(168,85,247,0.1)] relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-accent-violet" />
+            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
+              <UserPlus size={16} className="text-accent-glow" />
+              Pending Team Approvals
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {pendingRequests.map((r) => (
+                <div key={r.employeeId} className="flex flex-col gap-3 rounded-lg border border-white/5 bg-[#12101f]/80 p-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-bold text-sm text-white">{r.employeeName}</p>
+                      <p className="text-[10px] text-slate-400 capitalize">{r.employeeRole} • {r.department}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => org && approveRequest(org.id, r.employeeId, user.id)}
+                      className="flex-1 py-1.5 rounded-md bg-green-500/10 border border-green-500/30 text-xs font-semibold text-green-400 hover:bg-green-500/20 transition-all flex items-center justify-center gap-1"
+                    >
+                      <Check size={12} /> Approve
+                    </button>
+                    <button
+                      onClick={() => org && denyRequest(org.id, r.employeeId)}
+                      className="flex-1 py-1.5 rounded-md bg-red-500/10 border border-red-500/30 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition-all flex items-center justify-center gap-1"
+                    >
+                      <XIcon size={12} /> Deny
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       <div className="grid gap-6 p-6 lg:grid-cols-3">
         <div className="lg:col-span-2">

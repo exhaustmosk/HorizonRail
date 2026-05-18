@@ -28,8 +28,17 @@ export default function ProtectedRoute() {
     return <Outlet />
   }
 
-  // If already joined but trying to visit onboarding, redirect to home page
-  if (location.pathname === '/onboarding') {
+  // Guard manager selection: employees who are 'joined' but have no manager assigned yet
+  // must select a manager before accessing any features
+  if (user.role === 'employee' && !user.managerId) {
+    if (location.pathname !== '/select-manager') {
+      return <Navigate to="/select-manager" replace />
+    }
+    return <Outlet />
+  }
+
+  // If already joined but trying to visit onboarding or select-manager, redirect to home page
+  if (location.pathname === '/onboarding' || location.pathname === '/select-manager') {
     const redirect =
       user.role === 'manager'
         ? '/manager'

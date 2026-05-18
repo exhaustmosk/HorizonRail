@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useOrgStore } from '../store/orgStore'
 import { useCycleStore } from '../store/cycleStore'
 import { useGoalStore } from '../store/goalStore'
@@ -13,9 +13,11 @@ import PushKpiPanel from '../components/goals/PushKpiPanel'
 import CyclePolicyEditor from '../components/checkin/CyclePolicyEditor'
 import CycleChangeRequestQueue from '../components/checkin/CycleChangeRequestQueue'
 import Badge from '../components/ui/Badge'
-import { Check, X as XIcon, UserPlus, Building, Calendar, Mail } from 'lucide-react'
+import { Check, X as XIcon, UserPlus, Building, Calendar, Mail, MessageSquare, Loader2, ShieldAlert } from 'lucide-react'
+import { getOrgNotificationConfig, saveOrgNotificationConfig, testTeamsWebhook } from '../lib/notificationService'
+import EscalationPanel from '../components/admin/EscalationPanel'
 
-type Tab = 'requests' | 'org' | 'kpi' | 'cycle' | 'audit'
+type Tab = 'requests' | 'org' | 'kpi' | 'cycle' | 'audit' | 'notifications' | 'escalations'
 
 export default function AdminPanel() {
   const admin = useAuthStore((s) => s.user)
@@ -25,9 +27,13 @@ export default function AdminPanel() {
 
   const approveRequest = useOrgStore((s) => s.approveJoinRequest)
   const denyRequest = useOrgStore((s) => s.denyJoinRequest)
+  const reassignManager = useOrgStore((s) => s.reassignManager)
 
   const [tab, setTab] = useState<Tab>(joinRequests.length > 0 ? 'requests' : 'cycle')
   const employees = useOrgStore((s) => s.employees)
+
+  const managers = employees.filter((e) => e.role === 'manager' && e.organizationStatus === 'joined')
+  const unassignedEmployees = employees.filter((e) => !e.managerId && e.role === 'employee' && e.organizationStatus === 'joined')
   const checkInPeriods = useOrgStore((s) => s.checkInPeriods)
   const updateCheckInPeriod = useOrgStore((s) => s.updateCheckInPeriod)
   const policy = useCycleStore((s) => s.policy)
@@ -54,8 +60,47 @@ export default function AdminPanel() {
     { id: 'org', label: 'Org Management' },
     { id: 'kpi', label: 'Push KPI' },
     { id: 'cycle', label: 'Cycle & check-ins', badge: pendingCount || undefined },
+    { id: 'escalations', label: 'Escalations' },
+    { id: 'notifications', label: 'Notifications' },
     { id: 'audit', label: 'Audit Log' },
   ]
+
+  // Notifications state
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [webhookEnabled, setWebhookEnabled] = useState(false)
+  const [isSavingWebhook, setIsSavingWebhook] = useState(false)
+  const [isTestingWebhook, setIsTestingWebhook] = useState(false)
+  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null)
+
+  // Fetch org config on mount/tab change
+  useEffect(() => {
+    if (adminOrg?.id && tab === 'notifications') {
+      getOrgNotificationConfig(adminOrg.id).then((config) => {
+        setWebhookUrl(config.teams_webhook_url)
+        setWebhookEnabled(config.enabled)
+      })
+    }
+  }, [adminOrg?.id, tab])
+
+  const handleSaveWebhook = async () => {
+    if (!adminOrg) return
+    setIsSavingWebhook(true)
+    await saveOrgNotificationConfig(adminOrg.id, {
+      teams_webhook_url: webhookUrl,
+      enabled: webhookEnabled
+    })
+    setIsSavingWebhook(false)
+  }
+
+  const handleTestWebhook = async () => {
+    if (!webhookUrl) return
+    setIsTestingWebhook(true)
+    setTestResult(null)
+    const success = await testTeamsWebhook(webhookUrl)
+    setTestResult(success ? 'success' : 'error')
+    setIsTestingWebhook(false)
+    setTimeout(() => setTestResult(null), 5000)
+  }
 
   return (
     <>
@@ -174,32 +219,91 @@ export default function AdminPanel() {
         )}
 
         {tab === 'org' && (
-          <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-bg-surface">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                  <th className="p-3">Name</th>
-                  <th className="p-3">Department</th>
-                  <th className="p-3">Manager</th>
-                  <th className="p-3">Role</th>
-                </tr>
-              </thead>
-              <tbody>
-                {employees.map((e) => (
-                  <tr
-                    key={e.id}
-                    className="border-b border-[var(--border-subtle)] last:border-0"
-                  >
-                    <td className="p-3">{e.name}</td>
-                    <td className="p-3">{e.department}</td>
-                    <td className="p-3">
-                      {employees.find((m) => m.id === e.managerId)?.name ?? '—'}
-                    </td>
-                    <td className="p-3 capitalize">{e.role}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-6">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Building size={20} className="text-accent-glow" />
+                Organizational Tree
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Manage your reporting structure. You can instantly reassign any employee to a different manager.
+              </p>
+            </div>
+
+            <div className="grid gap-6">
+              {managers.map((m) => {
+                const directReports = employees.filter((e) => e.managerId === m.id)
+                return (
+                  <Card key={m.id} className="border border-purple-strong/30 bg-[#12101f]/60 p-5 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-purple to-violet-600" />
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple/10 text-xs font-bold text-accent-glow">
+                        {m.initials}
+                      </div>
+                      <div>
+                        <h3 className="font-heading font-bold text-white text-base">{m.name}</h3>
+                        <p className="text-xs text-slate-400">Manager • {m.department} • {directReports.length} reports</p>
+                      </div>
+                    </div>
+                    
+                    <div className="ml-12 space-y-2">
+                      {directReports.length === 0 ? (
+                        <p className="text-xs text-slate-500 italic">No direct reports currently.</p>
+                      ) : (
+                        directReports.map((e) => (
+                          <div key={e.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5 hover:border-white/10 transition-colors">
+                            <div>
+                              <p className="text-sm font-medium text-slate-200">{e.name}</p>
+                              <p className="text-[10px] text-slate-400">{e.department} • {e.role}</p>
+                            </div>
+                            <select
+                              value={e.managerId ?? ''}
+                              onChange={(evt) => reassignManager(e.id, evt.target.value || null)}
+                              className="text-xs rounded border border-white/10 bg-[#12101f] text-slate-300 py-1 px-2 focus:border-purple focus:outline-none"
+                            >
+                              <option value="">Unassigned</option>
+                              {managers.map((mgr) => (
+                                <option key={mgr.id} value={mgr.id}>{mgr.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </Card>
+                )
+              })}
+
+              {unassignedEmployees.length > 0 && (
+                <Card className="border border-red-500/30 bg-red-500/5 p-5 relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
+                  <div className="mb-4">
+                    <h3 className="font-heading font-bold text-red-400 text-base">Unassigned Pool</h3>
+                    <p className="text-xs text-slate-400">These members need a manager assigned to access the workspace fully.</p>
+                  </div>
+                  <div className="ml-4 space-y-2">
+                    {unassignedEmployees.map((e) => (
+                      <div key={e.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5 hover:border-white/10 transition-colors">
+                        <div>
+                          <p className="text-sm font-medium text-slate-200">{e.name}</p>
+                          <p className="text-[10px] text-slate-400">{e.department} • {e.role}</p>
+                        </div>
+                        <select
+                          value={e.managerId ?? ''}
+                          onChange={(evt) => reassignManager(e.id, evt.target.value || null)}
+                          className="text-xs rounded border border-white/10 bg-[#12101f] text-slate-300 py-1 px-2 focus:border-purple focus:outline-none"
+                        >
+                          <option value="">Assign to...</option>
+                          {managers.map((mgr) => (
+                            <option key={mgr.id} value={mgr.id}>{mgr.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+            </div>
           </div>
         )}
 
@@ -382,6 +486,71 @@ export default function AdminPanel() {
           </div>
         )}
 
+        {tab === 'notifications' && (
+          <div className="space-y-6">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <MessageSquare size={20} className="text-[#5B5FC7]" />
+                Microsoft Teams Integration
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Configure organizational notifications to be sent to a Microsoft Teams channel via Incoming Webhooks.
+              </p>
+            </div>
+
+            <Card className="border border-white/5 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading font-bold text-sm text-white">Teams Webhook URL</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Paste the Incoming Webhook URL from your Teams channel connector.
+                  </p>
+                </div>
+                <label className="flex items-center cursor-pointer">
+                  <div className={`relative h-6 w-11 rounded-full transition-colors ${webhookEnabled ? 'bg-[#5B5FC7]' : 'bg-slate-700'}`}>
+                    <div className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${webhookEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </div>
+                  <input type="checkbox" className="sr-only" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
+                  <span className="ml-3 text-xs font-medium text-slate-300">{webhookEnabled ? 'Enabled' : 'Disabled'}</span>
+                </label>
+              </div>
+
+              <div>
+                <input
+                  type="text"
+                  placeholder="https://your-tenant.webhook.office.com/webhookb2/..."
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  className="w-full rounded-lg border border-white/10 bg-[#12101f] px-4 py-2.5 text-sm text-white focus:border-[#5B5FC7] focus:outline-none focus:ring-1 focus:ring-[#5B5FC7]"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <Button onClick={handleSaveWebhook} disabled={isSavingWebhook}>
+                  {isSavingWebhook ? <Loader2 size={16} className="animate-spin" /> : 'Save Configuration'}
+                </Button>
+                <Button variant="secondary" onClick={handleTestWebhook} disabled={isTestingWebhook || !webhookUrl}>
+                  {isTestingWebhook ? <Loader2 size={16} className="animate-spin" /> : 'Test Webhook'}
+                </Button>
+                
+                {testResult === 'success' && <span className="text-xs text-emerald-400 flex items-center gap-1"><Check size={14} /> Test card sent successfully! Check Teams.</span>}
+                {testResult === 'error' && <span className="text-xs text-red-400 flex items-center gap-1"><XIcon size={14} /> Failed to send test. Check the URL.</span>}
+              </div>
+
+              <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 mt-6">
+                <h4 className="text-xs font-bold text-blue-400 mb-2">How to get a Webhook URL:</h4>
+                <ol className="list-decimal list-inside text-xs text-slate-300 space-y-1.5 ml-1">
+                  <li>In Microsoft Teams, go to the channel where you want notifications.</li>
+                  <li>Click the three dots <strong>(...)</strong> next to the channel name and select <strong>Connectors</strong> (or <strong>Workflows</strong> in newer Teams versions).</li>
+                  <li>Search for <strong>Incoming Webhook</strong> and click <strong>Add</strong>.</li>
+                  <li>Name it "HorizonRail", upload a logo if desired, and click <strong>Create</strong>.</li>
+                  <li>Copy the provided URL and paste it above.</li>
+                </ol>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {tab === 'audit' && (
           <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-bg-surface">
             <table className="w-full text-left text-sm">
@@ -414,6 +583,10 @@ export default function AdminPanel() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {tab === 'escalations' && adminOrg && (
+          <EscalationPanel orgId={adminOrg.id} />
         )}
       </div>
     </>

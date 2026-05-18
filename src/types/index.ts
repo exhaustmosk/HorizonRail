@@ -63,6 +63,8 @@ export interface JoinRequest {
   employeeEmail: string
   employeeRole: 'employee' | 'manager'
   department: string
+  managerId?: string
+  managerName?: string
   requestedAt: number // Unix timestamp
 }
 
@@ -143,4 +145,31 @@ export interface AuditEntry {
   targetLabel: string
   oldValue: string
   newValue: string
+}
+
+export type EscalationCondition = 'no_goals_submitted' | 'goals_unapproved' | 'checkin_missed'
+export type EscalationTarget = 'manager' | 'skip_level' | 'admin' | 'hr'
+
+export interface EscalationPolicy {
+  id: string
+  orgId: string
+  condition: EscalationCondition
+  daysThreshold: number
+  escalateTo: EscalationTarget
+  enabled: boolean
+  createdAt: Date
+}
+
+export interface EscalationLog {
+  id: string
+  orgId: string
+  policyId: string
+  employeeId: string
+  status: 'open' | 'resolved'
+  resolvedAt?: Date
+  createdAt: Date
+  
+  // Joins
+  policy?: EscalationPolicy
+  employee?: Employee
 }

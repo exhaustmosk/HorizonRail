@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS public.join_requests (
   employee_email  TEXT NOT NULL,
   employee_role   TEXT NOT NULL CHECK (employee_role IN ('employee', 'manager')),
   department      TEXT NOT NULL,
+  manager_id      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  manager_name    TEXT,
   requested_at    TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(org_id, employee_id)
 );
@@ -322,6 +324,7 @@ DROP POLICY IF EXISTS "jr_select_own" ON public.join_requests;
 CREATE POLICY "jr_select_own" ON public.join_requests
   FOR SELECT USING (
     employee_id = auth.uid()
+    OR manager_id = auth.uid()
     OR org_id IN (SELECT id FROM public.organizations WHERE admin_id = auth.uid())
   );
 
@@ -333,6 +336,7 @@ DROP POLICY IF EXISTS "jr_delete" ON public.join_requests;
 CREATE POLICY "jr_delete" ON public.join_requests
   FOR DELETE USING (
     employee_id = auth.uid()
+    OR manager_id = auth.uid()
     OR org_id IN (SELECT id FROM public.organizations WHERE admin_id = auth.uid())
   );
 
@@ -460,6 +464,127 @@ CREATE POLICY "al_insert" ON public.audit_log
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 -- ================================================
+-- 11. NOTIFICATION SETTINGS (per user)
+-- ================================================
+CREATE TABLE IF NOT EXISTS public.notification_settings (
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id             UUID NOT NULL UNIQUE REFERENCES public.profiles(id) ON DELETE CASCADE,
+  email_enabled       BOOLEAN NOT NULL DEFAULT TRUE,
+  teams_enabled       BOOLEAN NOT NULL DEFAULT TRUE,
+  on_goal_submitted   BOOLEAN NOT NULL DEFAULT TRUE,
+  on_goal_approved    BOOLEAN NOT NULL DEFAULT TRUE,
+  on_goal_rejected    BOOLEAN NOT NULL DEFAULT TRUE,
+  on_checkin_reminder BOOLEAN NOT NULL DEFAULT TRUE,
+  on_join_request     BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at          TIMESTAMPTZ DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.notification_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "ns_select" ON public.notification_settings;
+CREATE POLICY "ns_select" ON public.notification_settings
+  FOR SELECT USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "ns_insert" ON public.notification_settings;
+CREATE POLICY "ns_insert" ON public.notification_settings
+  FOR INSERT WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "ns_update" ON public.notification_settings;
+CREATE POLICY "ns_update" ON public.notification_settings
+  FOR UPDATE USING (user_id = auth.uid());
+
+-- Upsert support for notification_settings
+DROP POLICY IF EXISTS "ns_upsert" ON public.notification_settings;
+CREATE POLICY "ns_upsert" ON public.notification_settings
+  FOR ALL USING (user_id = auth.uid());
+
+CREATE INDEX IF NOT EXISTS idx_notification_settings_user ON public.notification_settings(user_id);
+
+-- ================================================
+-- 12. ORG NOTIFICATION CONFIG (per organization)
+-- ================================================
+CREATE TABLE IF NOT EXISTS public.org_notification_config (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  org_id            UUID NOT NULL UNIQUE REFERENCES public.organizations(id) ON DELETE CASCADE,
+  teams_webhook_url TEXT,
+  sender_name       TEXT DEFAULT 'HorizonRail',
+  enabled           BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.org_notification_config ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "onc_select" ON public.org_notification_config;
+CREATE POLICY "onc_select" ON public.org_notification_config
+  FOR SELECT USING (org_id = public.my_org_id());
+
+DROP POLICY IF EXISTS "onc_all" ON public.org_notification_config;
+CREATE POLICY "onc_all" ON public.org_notification_config
+  FOR ALL USING (
+    org_id IN (SELECT id FROM public.organizations WHERE admin_id = auth.uid())
+  );
+
+CREATE INDEX IF NOT EXISTS idx_org_notification_config_org ON public.org_notification_config(org_id);
+
+-- ================================================
+-- 13. ESCALATION POLICIES (Admin defined rules)
+-- ================================================
+CREATE TABLE IF NOT EXISTS public.escalation_policies (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  org_id          UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  condition       TEXT NOT NULL, -- e.g., 'no_goals_submitted', 'goals_unapproved', 'checkin_missed'
+  days_threshold  INTEGER NOT NULL,
+  escalate_to     TEXT NOT NULL, -- e.g., 'manager', 'skip_level', 'admin', 'hr'
+  enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.escalation_policies ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "ep_select" ON public.escalation_policies;
+CREATE POLICY "ep_select" ON public.escalation_policies
+  FOR SELECT USING (org_id = public.my_org_id());
+
+DROP POLICY IF EXISTS "ep_all" ON public.escalation_policies;
+CREATE POLICY "ep_all" ON public.escalation_policies
+  FOR ALL USING (
+    org_id IN (SELECT id FROM public.organizations WHERE admin_id = auth.uid())
+  );
+
+CREATE INDEX IF NOT EXISTS idx_escalation_policies_org ON public.escalation_policies(org_id);
+
+-- ================================================
+-- 14. ESCALATION LOGS (Triggered incidents)
+-- ================================================
+CREATE TABLE IF NOT EXISTS public.escalation_logs (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  org_id          UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  policy_id       UUID NOT NULL REFERENCES public.escalation_policies(id) ON DELETE CASCADE,
+  employee_id     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  status          TEXT NOT NULL DEFAULT 'open', -- 'open', 'resolved'
+  resolved_at     TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.escalation_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "el_select" ON public.escalation_logs;
+CREATE POLICY "el_select" ON public.escalation_logs
+  FOR SELECT USING (org_id = public.my_org_id());
+
+DROP POLICY IF EXISTS "el_all" ON public.escalation_logs;
+CREATE POLICY "el_all" ON public.escalation_logs
+  FOR ALL USING (
+    org_id IN (SELECT id FROM public.organizations WHERE admin_id = auth.uid())
+  );
+
+CREATE INDEX IF NOT EXISTS idx_escalation_logs_org ON public.escalation_logs(org_id);
+CREATE INDEX IF NOT EXISTS idx_escalation_logs_employee ON public.escalation_logs(employee_id);
+
+-- ================================================
 -- SEED — Default Acme Corp organization (optional demo)
 -- You can delete these if you want a clean start.
 -- ================================================
@@ -467,3 +592,4 @@ CREATE POLICY "al_insert" ON public.audit_log
 -- when they sign up through the Auth system. The seeded org below
 -- provides a target for them to join.
 -- To fully seed demo data, use the seed RPC below after creating users.
+

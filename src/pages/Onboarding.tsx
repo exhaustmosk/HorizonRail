@@ -16,7 +16,6 @@ export default function Onboarding() {
   const organizations = useOrgStore((s) => s.getOrganizations())
   const requestToJoin = useOrgStore((s) => s.requestToJoinOrganization)
   const cancelRequest = useOrgStore((s) => s.cancelJoinRequest)
-
   const [selectedOrgId, setSelectedOrgId] = useState('')
   const [customOrgName, setCustomOrgName] = useState('')
   const [department, setDepartment] = useState('')
@@ -35,7 +34,7 @@ export default function Onboarding() {
     return null
   }
 
-  const handleJoin = (e: React.FormEvent) => {
+  const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
@@ -46,7 +45,7 @@ export default function Onboarding() {
         return
       }
       // Create a temporary/placeholder organization in OrgStore to allow requesting
-      orgId = useOrgStore.getState().createOrganization(
+      orgId = await useOrgStore.getState().createOrganization(
         customOrgName.trim(),
         'placeholder-admin-id',
         'System Administrator',
@@ -68,7 +67,7 @@ export default function Onboarding() {
     // Update department in the employee object
     useOrgStore.getState().updateEmployee(user.id, { department: department.trim() })
 
-    // Dispatch the join request
+    // Dispatch the join request (manager will be selected after approval)
     requestToJoin(orgId, { ...user, department: department.trim() })
   }
 
@@ -270,6 +269,8 @@ export default function Onboarding() {
                     />
                   </div>
                 </div>
+
+
 
                 <button
                   type="submit"

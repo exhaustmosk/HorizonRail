@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import type { AuditEntry, CheckInPeriod, Employee, JoinRequest, Organization } from '../types'
 import { useAuthStore } from './authStore'
+import { notifyJoinRequest } from '../lib/notificationService'
 
 interface OrgStore {
   employees: Employee[]
@@ -32,10 +33,12 @@ interface OrgStore {
   // Organization onboarding
   getOrganizations: () => Organization[]
   createOrganization: (name: string, adminId: string, adminName: string, industry?: string, size?: string) => Promise<string>
-  requestToJoinOrganization: (orgId: string, emp: Employee) => Promise<void>
+  fetchOrgManagers: (orgId: string) => Promise<{ id: string; name: string }[]>
+  requestToJoinOrganization: (orgId: string, emp: Employee, managerId?: string, managerName?: string) => Promise<void>
   cancelJoinRequest: (orgId: string, empId: string) => Promise<void>
-  approveJoinRequest: (orgId: string, empId: string) => Promise<void>
+  approveJoinRequest: (orgId: string, empId: string, managerId?: string) => Promise<void>
   denyJoinRequest: (orgId: string, empId: string) => Promise<void>
+  reassignManager: (employeeId: string, newManagerId: string | null) => Promise<void>
 }
 
 // ─── Converters ─────────────────────────────────────────────────────────────
@@ -363,7 +366,16 @@ export const useOrgStore = create<OrgStore>((set, get) => ({
     return ''
   },
 
-  requestToJoinOrganization: async (orgId, emp) => {
+  fetchOrgManagers: async (orgId) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, name')
+      .eq('org_id', orgId)
+      .eq('role', 'manager')
+    return (data as { id: string; name: string }[]) ?? []
+  },
+
+  requestToJoinOrganization: async (orgId, emp, managerId, managerName) => {
     const orgName = get().organizations.find((o) => o.id === orgId)?.name ?? ''
 
     await supabase.from('join_requests').upsert({
@@ -373,6 +385,8 @@ export const useOrgStore = create<OrgStore>((set, get) => ({
       employee_email: emp.email,
       employee_role: emp.role,
       department: emp.department,
+      manager_id: managerId ?? null,
+      manager_name: managerName ?? null,
     })
 
     await supabase
@@ -398,6 +412,8 @@ export const useOrgStore = create<OrgStore>((set, get) => ({
                   employeeEmail: emp.email,
                   employeeRole: emp.role as 'employee' | 'manager',
                   department: emp.department,
+                  managerId,
+                  managerName,
                   requestedAt: Date.now(),
                 },
               ],
@@ -415,6 +431,20 @@ export const useOrgStore = create<OrgStore>((set, get) => ({
         organizationStatus: 'pending'
       })
     }
+
+    // Notify the org admin about the join request
+    try {
+      const org = get().organizations.find(o => o.id === orgId)
+      if (org) {
+        // Need to find the admin's email and user ID. Usually we have it if they are in employees list,
+        // or we can just fetch it from profiles directly if not loaded.
+        // Let's get it from the employees list if possible.
+        const admin = get().employees.find(e => e.id === org.adminId)
+        if (admin) {
+          notifyJoinRequest(admin.id, admin.email, admin.name, emp.name, emp.email, emp.role, emp.department, orgId)
+        }
+      }
+    } catch { /* ignore notification errors */ }
   },
 
   cancelJoinRequest: async (orgId, empId) => {
@@ -452,21 +482,26 @@ export const useOrgStore = create<OrgStore>((set, get) => ({
     }
   },
 
-  approveJoinRequest: async (orgId, empId) => {
+  approveJoinRequest: async (orgId, empId, managerId) => {
     await supabase
       .from('join_requests')
       .delete()
       .eq('org_id', orgId)
       .eq('employee_id', empId)
 
+    const updateData: Record<string, unknown> = { org_status: 'joined' }
+    if (managerId) {
+      updateData.manager_id = managerId
+    }
+
     await supabase
       .from('profiles')
-      .update({ org_status: 'joined' })
+      .update(updateData)
       .eq('id', empId)
 
     set((s) => ({
       employees: s.employees.map((e) =>
-        e.id === empId ? { ...e, organizationStatus: 'joined' } : e,
+        e.id === empId ? { ...e, organizationStatus: 'joined', managerId: managerId ?? e.managerId } : e,
       ),
       organizations: s.organizations.map((o) =>
         o.id === orgId
@@ -523,6 +558,32 @@ export const useOrgStore = create<OrgStore>((set, get) => ({
       target_label: get().employees.find((e) => e.id === empId)?.name ?? empId,
       old_value: 'pending',
       new_value: 'none',
+    })
+  },
+
+  reassignManager: async (employeeId, newManagerId) => {
+    await supabase
+      .from('profiles')
+      .update({ manager_id: newManagerId })
+      .eq('id', employeeId)
+
+    set((s) => ({
+      employees: s.employees.map((e) =>
+        e.id === employeeId ? { ...e, managerId: newManagerId ?? undefined } : e,
+      ),
+    }))
+
+    const user = useAuthStore.getState().user
+    const emp = get().employees.find((e) => e.id === employeeId)
+    await supabase.from('audit_log').insert({
+      org_id: user?.organizationId ?? null,
+      actor_id: user?.id ?? 'system',
+      actor_name: user?.name ?? 'Admin',
+      action: 'MANAGER_REASSIGNED',
+      target_id: employeeId,
+      target_label: emp?.name ?? employeeId,
+      old_value: emp?.managerId ?? 'Unassigned',
+      new_value: newManagerId ?? 'Unassigned',
     })
   },
 }))
