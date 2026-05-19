@@ -108,6 +108,7 @@ interface GoalStore {
   pushKPI: (kpi: Partial<Goal>, employeeIds: string[]) => Promise<void>
   lockAllApproved: () => Promise<void>
   unlockGoal: (employeeId: string, goalId: string, reason: string) => Promise<void>
+  distributeWeightageEqually: (employeeId: string) => Promise<void>
 }
 
 export const useGoalStore = create<GoalStore>(() => ({
@@ -361,7 +362,7 @@ export const useGoalStore = create<GoalStore>(() => ({
           uom: kpi.uom ?? 'numeric_min',
           target: kpi.target ?? 0,
           target_date: kpi.targetDate?.toISOString() ?? null,
-          weightage: 10,
+          weightage: 0,
           is_admin_pushed: true,
           approval_status: 'approved',
           locked: true,
@@ -405,5 +406,35 @@ export const useGoalStore = create<GoalStore>(() => ({
     await supabase.from('goals').update({ locked: false }).eq('id', goalId)
     await refreshEmployeeGoals(employeeId)
     await audit('GOAL_UNLOCKED', goalId, reason, 'locked', 'unlocked')
+  },
+
+  distributeWeightageEqually: async (employeeId) => {
+    const goals = useOrgStore.getState().getEmployeeById(employeeId)?.goals ?? []
+    if (goals.length === 0) return
+
+    const N = goals.length
+    const base = Math.floor(100 / N)
+    const remainder = 100 % N
+
+    const updates = goals.map((g, idx) => {
+      const weightage = base + (idx < remainder ? 1 : 0)
+      return {
+        id: g.id,
+        weightage,
+      }
+    })
+
+    // Update in Supabase in parallel
+    await Promise.all(
+      updates.map(({ id, weightage }) =>
+        supabase
+          .from('goals')
+          .update({ weightage })
+          .eq('id', id)
+      )
+    )
+
+    await refreshEmployeeGoals(employeeId)
+    await audit('GOALS_REBALANCED', employeeId, 'Goal sheet', '', 'Equally distributed weightage')
   },
 }))

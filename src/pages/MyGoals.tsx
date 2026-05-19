@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Trash2, Pencil, Plus } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useAuthStore } from '../store/authStore'
 import { useOrgStore } from '../store/orgStore'
 import { useGoalStore } from '../store/goalStore'
@@ -18,9 +19,12 @@ export default function MyGoals() {
   const updateGoal = useGoalStore((s) => s.updateGoal)
   const deleteGoal = useGoalStore((s) => s.deleteGoal)
   const submitGoals = useGoalStore((s) => s.submitGoals)
+  const distributeWeightageEqually = useGoalStore((s) => s.distributeWeightageEqually)
 
   const emp = employees.find((e) => e.id === user.id) ?? user
   const goals = emp.goals
+  const pendingPushedGoals = goals.filter((g) => g.isAdminPushed && g.weightage === 0)
+  const hasPendingPushed = pendingPushedGoals.length > 0
   const errors = validateGoalSheet(goals)
   const [formOpen, setFormOpen] = useState(false)
   const [editGoal, setEditGoal] = useState<Goal | undefined>()
@@ -29,7 +33,11 @@ export default function MyGoals() {
 
   const handleSave = (partial: Partial<Goal>) => {
     if (editGoal) {
-      updateGoal(user.id, editGoal.id, partial)
+      updateGoal(user.id, editGoal.id, {
+        ...partial,
+        // Revert to draft if it was submitted so manager has to re-approve
+        approvalStatus: editGoal.approvalStatus === 'submitted' ? 'draft' : editGoal.approvalStatus
+      })
     } else {
       const goal: Goal = {
         id: `g-${user.id}-${Date.now()}`,
@@ -57,18 +65,63 @@ export default function MyGoals() {
     <>
       <Topbar title="My Goals" subtitle="Goal sheet management" />
       <div className="space-y-6 p-6">
+        {hasPendingPushed && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative overflow-hidden rounded-xl border border-accent-amber/40 bg-accent-amber/5 px-5 py-4 text-sm text-[var(--text-primary)] shadow-lg glow-amber-sm"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-amber/20 text-accent-amber animate-pulse">
+                ⚠️
+              </span>
+              <div className="space-y-1">
+                <h4 className="font-bold text-accent-amber">New Task Assigned Pending Weightage</h4>
+                <p className="text-[var(--text-secondary)] leading-relaxed">
+                  Your manager or administrator has pushed {pendingPushedGoals.length} new task(s) to your goal sheet:{' '}
+                  <span className="font-semibold text-accent-amber">
+                    {pendingPushedGoals.map((g) => `“${g.title}”`).join(', ')}
+                  </span>
+                  . These tasks currently carry 0% weightage. To make your sheet valid, you must allocate at least 10% weightage to each task inline in the table below and re-balance your other goals so your total weightage is exactly 100%.
+                </p>
+                <div className="pt-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => distributeWeightageEqually(user.id)}
+                    className="text-accent-amber border-accent-amber/40 hover:bg-accent-amber/10 hover:text-accent-amber"
+                  >
+                    Auto-Distribute Weightage Equally
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         <GoalSheet goals={goals} />
 
         <div className="flex items-center justify-between">
-          <Button
-            onClick={() => {
-              setEditGoal(undefined)
-              setFormOpen(true)
-            }}
-            disabled={goals.length >= MAX_GOALS}
-          >
-            <Plus size={16} /> Add goal
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => {
+                setEditGoal(undefined)
+                setFormOpen(true)
+              }}
+              disabled={goals.length >= MAX_GOALS}
+            >
+              <Plus size={16} /> Add goal
+            </Button>
+            {goals.length > 0 && (
+              <Button
+                variant="secondary"
+                onClick={() => distributeWeightageEqually(user.id)}
+                title="Distribute 100% weightage equally among all goals"
+              >
+                Distribute Weightage Equally
+              </Button>
+            )}
+          </div>
           <Button
             disabled={errors.length > 0}
             onClick={() => submitGoals(user.id)}
@@ -107,18 +160,18 @@ export default function MyGoals() {
                       : g.target}
                   </td>
                   <td className="p-3">
-                    {!g.locked ? (
+                    {g.approvalStatus !== 'approved' || g.isAdminPushed || hasPendingPushed ? (
                       <input
                         type="number"
-                        min={10}
+                        min={0}
                         max={100}
                         value={g.weightage}
                         onChange={(e) =>
                           updateGoal(user.id, g.id, {
-                            weightage: Number(e.target.value),
+                            weightage: Number(e.target.value)
                           })
                         }
-                        className="w-16 rounded border border-[var(--border-subtle)] bg-bg-elevated px-2 py-1"
+                        className="w-16 rounded border border-[var(--border-subtle)] bg-bg-elevated px-2 py-1 font-semibold"
                       />
                     ) : (
                       `${g.weightage}%`
@@ -126,7 +179,7 @@ export default function MyGoals() {
                   </td>
                   <td className="p-3 capitalize">{g.approvalStatus}</td>
                   <td className="p-3">
-                    {!g.locked && (
+                    {g.approvalStatus !== 'approved' && !g.isAdminPushed && (
                       <div className="flex gap-1">
                         <button
                           type="button"
@@ -134,7 +187,8 @@ export default function MyGoals() {
                             setEditGoal(g)
                             setFormOpen(true)
                           }}
-                          className="rounded p-1 hover:bg-[var(--bg-glass)]"
+                          className="rounded p-1 hover:bg-[var(--bg-glass)] text-blue-400"
+                          title="Edit Goal"
                         >
                           <Pencil size={14} />
                         </button>
@@ -142,6 +196,7 @@ export default function MyGoals() {
                           type="button"
                           onClick={() => deleteGoal(user.id, g.id)}
                           className="rounded p-1 hover:bg-accent-red/20 text-accent-red"
+                          title="Delete Goal"
                         >
                           <Trash2 size={14} />
                         </button>

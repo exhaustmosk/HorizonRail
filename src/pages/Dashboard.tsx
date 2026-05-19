@@ -40,6 +40,8 @@ export default function Dashboard() {
   const now = useLiveClock()
   const emp = employees.find((e) => e.id === user.id) ?? user
   const goals = emp.goals
+  const pendingPushedGoals = goals.filter((g) => g.isAdminPushed && g.weightage === 0)
+  const hasPendingPushed = pendingPushedGoals.length > 0
   const tasks = useMemo(
     () => buildEmployeeTasks(emp, checkInPeriods, policy, now, forcedId),
     [emp, checkInPeriods, policy, now, forcedId],
@@ -136,6 +138,44 @@ export default function Dashboard() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
+            {hasPendingPushed && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="relative overflow-hidden rounded-xl border border-accent-purple/30 bg-bg-surface/60 p-5 shadow-lg glow-purple-sm backdrop-blur-md"
+              >
+                {/* Background glow effects */}
+                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-accent-purple/10 blur-2xl" />
+                <div className="absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-accent-teal/10 blur-2xl" />
+
+                <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-purple/15 text-accent-purple shadow-inner animate-pulse">
+                      <Target size={20} className="text-accent-glow" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-heading font-bold text-[var(--text-primary)]">
+                        New Tasks Assigned!
+                      </h3>
+                      <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-xl">
+                        Your manager/admin has pushed {pendingPushedGoals.length} new KPI(s) to your sheet:{' '}
+                        <span className="font-semibold text-accent-glow">
+                          {pendingPushedGoals.map((g) => `“${g.title}”`).join(', ')}
+                        </span>
+                        . Please assign their weightages to activate them and keep your goal sheet valid.
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    to="/my-goals"
+                    className="inline-flex shrink-0 items-center justify-center gap-1 rounded-xl bg-accent-purple px-4 py-2 text-xs font-semibold text-white shadow-md transition-all hover:bg-accent-purple/90 sm:self-center"
+                  >
+                    Adjust Goal Sheet <ArrowRight size={14} />
+                  </Link>
+                </div>
+              </motion.div>
+            )}
+
             {sheetErrors.length > 0 && (
               <div className="rounded-xl border border-accent-amber/40 bg-accent-amber/10 px-4 py-3 text-sm text-accent-amber">
                 {sheetErrors[0]}

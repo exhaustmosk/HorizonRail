@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Lock, Atom, Activity, User, Building, Briefcase, Info } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
+import { supabase } from '../lib/supabase'
 import TopNav from '../components/layout/TopNav'
 import { PRODUCT_NAME } from '../lib/constants'
 
@@ -42,14 +43,24 @@ export default function Login() {
     }
 
     if (mode === 'login') {
-      const { error: loginError } = await login(email, password)
+      const { error: loginError, user: loggedUser } = await login(email, password)
       if (loginError) {
         setError(loginError + ' (Have you created this account in Supabase yet?)')
         return
       }
       
-      const loggedUser = useAuthStore.getState().user
       if (!loggedUser) return
+
+      if (loggedUser.role !== tab) {
+        await supabase.auth.signOut()
+        useAuthStore.getState().setUser(null)
+        const article = tab === 'manager' ? 'a' : 'an'
+        const regArticle = loggedUser.role === 'manager' ? 'a' : 'an'
+        setError(
+          `This account is registered as ${regArticle} ${loggedUser.role}. Please select the ${loggedUser.role} tab to sign in.`
+        )
+        return
+      }
 
       if (loggedUser.organizationStatus !== 'joined') {
         navigate('/onboarding')
@@ -123,12 +134,7 @@ export default function Login() {
     navigate('/dashboard')
   }
 
-  const tabHint =
-    tab === 'employee'
-      ? 'priya@acme.com / pass'
-      : tab === 'manager'
-        ? 'ramesh@acme.com or leena@acme.com / pass'
-        : 'divya@acme.com / pass'
+
 
   return (
     <div className="min-h-screen bg-mesh">
@@ -414,9 +420,7 @@ export default function Login() {
             </button>
           </div>
 
-          <p className="mt-6 text-center text-xs text-[var(--text-muted)]">
-            Demo ({tab}): {tabHint}
-          </p>
+
           <p className="mt-3 text-center text-sm">
             <Link to="/" className="text-accent-glow hover:underline">
               ← Back to home

@@ -20,12 +20,3 @@ export const CHECK_IN_STATUS_OPTIONS = [
   { value: 'completed' as const, label: 'Completed' },
 ] as const
 
-export const DEMO_CREDENTIALS: Record<
-  string,
-  { password: string; email: string }
-> = {
-  'priya@acme.com': { password: 'pass', email: 'priya@acme.com' },
-  'ramesh@acme.com': { password: 'pass', email: 'ramesh@acme.com' },
-  'leena@acme.com': { password: 'pass', email: 'leena@acme.com' },
-  'divya@acme.com': { password: 'pass', email: 'divya@acme.com' },
-}

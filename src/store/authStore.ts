@@ -8,7 +8,7 @@ interface AuthStore {
   authChecked: boolean
 
   // Supabase Auth actions
-  login: (email: string, password: string) => Promise<{ error: string | null }>
+  login: (email: string, password: string) => Promise<{ error: string | null; user: Employee | null }>
   register: (
     name: string,
     email: string,
@@ -152,9 +152,23 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   login: async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return { error: error.message }
-    return { error: null }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return { error: error.message, user: null }
+
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profile) {
+        const employee = await profileToEmployee(profile)
+        set({ user: employee })
+        return { error: null, user: employee }
+      }
+    }
+    return { error: 'Failed to retrieve profile metadata.', user: null }
   },
 
   demoEntraIdLogin: async () => {
