@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, CheckCircle2, AlertTriangle, Play, ShieldAlert, X } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, AlertTriangle, Play, ShieldAlert } from 'lucide-react'
 import { useEscalationStore } from '../../store/escalationStore'
 import { useOrgStore } from '../../store/orgStore'
 import { runEscalationEngine } from '../../lib/escalationEngine'

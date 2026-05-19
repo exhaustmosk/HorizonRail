@@ -77,8 +77,6 @@ export default function CycleChangeRequestQueue({
                         r.id,
                         'approved',
                         note,
-                        user.id,
-                        user.name,
                       )
                       setReviewId(null)
                       setNote('')
@@ -94,8 +92,6 @@ export default function CycleChangeRequestQueue({
                         r.id,
                         'rejected',
                         note || 'Rejected',
-                        user.id,
-                        user.name,
                       )
                       setReviewId(null)
                       setNote('')

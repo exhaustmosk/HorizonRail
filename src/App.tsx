@@ -42,7 +42,7 @@ function InitialLoader() {
 }
 
 export default function App() {
-  const { initialize, loading: authLoading, authChecked, user } = useAuthStore()
+  const { initialize, authChecked, user } = useAuthStore()
   const { fetchAll, fetchOrganizations, fetchAuditLog, loading: orgLoading } = useOrgStore()
   const { fetchPolicy, fetchChangeRequests } = useCycleStore()
 

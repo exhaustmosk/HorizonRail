@@ -165,7 +165,7 @@ function buildTeamsCard(
  */
 export async function notifyGoalSubmitted(
   employeeName: string,
-  employeeEmail: string,
+  _employeeEmail: string,
   managerUserId: string,
   managerEmail: string,
   managerName: string,

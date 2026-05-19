@@ -97,7 +97,7 @@ export default function GoalDistribution() {
                 dataKey="value"
                 stroke="none"
               >
-                {thrustData.map((entry, index) => (
+                {thrustData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={CORPORATE_COLORS[index % CORPORATE_COLORS.length]} />
                 ))}
               </Pie>
@@ -122,7 +122,7 @@ export default function GoalDistribution() {
                 dataKey="value"
                 stroke="none"
               >
-                {uomData.map((entry, index) => (
+                {uomData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={CORPORATE_COLORS[(index + 2) % CORPORATE_COLORS.length]} />
                 ))}
               </Pie>

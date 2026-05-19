@@ -91,7 +91,7 @@ async function profileToEmployee(profile: Record<string, unknown>): Promise<Empl
   }
 }
 
-export const useAuthStore = create<AuthStore>((set, get) => ({
+export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   loading: true,
   authChecked: false,
@@ -180,6 +180,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     
     // 2. Try to log in first
     let { data: sessionData, error } = await supabase.auth.signInWithPassword({ email: demoEmail, password: demoPass })
+    let userData: any = sessionData
     
     // 3. If user doesn't exist, register them
     if (error && error.message.includes('Invalid login credentials')) {
@@ -189,12 +190,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         options: { data: { name: 'Alex Entra', role: 'employee', department: 'Engineering' } },
       })
       if (regError) return { error: regError.message }
-      sessionData = regData
+      userData = regData
     } else if (error) {
       return { error: error.message }
     }
 
-    if (!sessionData?.user) return { error: 'OAuth simulation failed' }
+    if (!userData?.user) return { error: 'OAuth simulation failed' }
 
     // 4. MOCK GRAPH API SYNC: Find an org and a manager to auto-assign
     const { data: orgs } = await supabase.from('organizations').select('id, name').limit(1)
@@ -221,7 +222,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           role: 'employee',
           department: 'Engineering (Azure Synced)'
         })
-        .eq('id', sessionData.user.id)
+        .eq('id', userData.user.id)
     }
 
     return { error: null }

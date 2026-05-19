@@ -16,7 +16,7 @@ import { useAuthStore } from '../store/authStore'
 import { useOrgStore } from '../store/orgStore'
 import { useGoalStore } from '../store/goalStore'
 import Topbar from '../components/layout/Topbar'
-import type { Goal, Employee } from '../types'
+import type { Goal } from '../types'
 
 type FilterStatus = 'all' | 'submitted' | 'approved' | 'rejected' | 'draft'
 

@@ -15,7 +15,7 @@ interface EscalationStore {
   resolveEscalation: (id: string) => Promise<void>
 }
 
-export const useEscalationStore = create<EscalationStore>((set, get) => ({
+export const useEscalationStore = create<EscalationStore>((set) => ({
   policies: [],
   logs: [],
   loading: false,
