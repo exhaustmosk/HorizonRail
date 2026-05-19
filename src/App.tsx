@@ -14,6 +14,7 @@ import AdminPanel from './pages/AdminPanel'
 import Reports from './pages/Reports'
 import AuditLog from './pages/AuditLog'
 import Analysis from './pages/Analysis'
+import NeuronMap from './pages/NeuronMap'
 import Profile from './pages/Profile'
 import CheckIns from './pages/CheckIns'
 import Onboarding from './pages/Onboarding'
@@ -90,6 +91,7 @@ export default function App() {
             <Route path="/manager/goals" element={<ManagerGoalSheet />} />
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/analysis" element={<Analysis />} />
+            <Route path="/neuron-map" element={<NeuronMap />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/audit" element={<AuditLog />} />

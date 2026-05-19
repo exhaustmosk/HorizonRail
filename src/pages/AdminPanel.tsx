@@ -499,6 +499,14 @@ export default function AdminPanel() {
             </div>
 
             <Card className="border border-white/5 space-y-6">
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex gap-3 text-xs text-amber-300">
+                <ShieldAlert className="h-5 w-5 shrink-0 text-amber-400" />
+                <div>
+                  <p className="font-semibold text-white mb-1">Developer Notice</p>
+                  <p>"I wasn't able to test this out because i dont't have paid teams , so dont have webhook feature for me :'("</p>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-heading font-bold text-sm text-white">Teams Webhook URL</h3>

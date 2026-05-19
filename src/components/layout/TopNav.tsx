@@ -8,6 +8,7 @@ import { PRODUCT_NAME } from '../../lib/constants'
 const employeeLinks = [
   { to: '/dashboard', label: 'Home' },
   { to: '/my-goals', label: 'My Goals' },
+  { to: '/neuron-map', label: 'Neuron Map' },
   { to: '/analysis', label: 'Analysis' },
   { to: '/reports', label: 'Reports' },
 ]
@@ -15,12 +16,14 @@ const employeeLinks = [
 const managerLinks = [
   { to: '/manager', label: 'Team' },
   { to: '/manager/goals', label: 'Goal Sheet' },
+  { to: '/neuron-map', label: 'Neuron Map' },
   { to: '/analysis', label: 'Analysis' },
   { to: '/reports', label: 'Reports' },
 ]
 
 const adminLinks = [
   { to: '/admin', label: 'Admin' },
+  { to: '/neuron-map', label: 'Neuron Map' },
   { to: '/analysis', label: 'Analysis' },
   { to: '/audit', label: 'Audit' },
   { to: '/reports', label: 'Reports' },

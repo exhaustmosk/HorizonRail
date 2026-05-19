@@ -2,9 +2,9 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 const ROLE_ROUTES: Record<string, string[]> = {
-  employee: ['/dashboard', '/my-goals', '/reports', '/analysis', '/profile'],
-  manager: ['/manager', '/reports', '/analysis', '/profile'],
-  admin: ['/admin', '/audit', '/reports', '/analysis', '/profile'],
+  employee: ['/dashboard', '/my-goals', '/neuron-map', '/reports', '/analysis', '/profile'],
+  manager: ['/manager', '/neuron-map', '/reports', '/analysis', '/profile'],
+  admin: ['/admin', '/neuron-map', '/audit', '/reports', '/analysis', '/profile'],
 }
 
 export default function ProtectedRoute() {

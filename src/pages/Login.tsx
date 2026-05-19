@@ -119,19 +119,7 @@ export default function Login() {
   }
 
   const handleMicrosoftSSO = async () => {
-    setError('')
-    setIsSsoLoading(true)
-    const { error: ssoError } = await demoEntraIdLogin()
-    
-    if (ssoError) {
-      setError(ssoError)
-      setIsSsoLoading(false)
-      return
-    }
-
-    // Since we auto-joined the org and auto-assigned a manager in the demo,
-    // they bypass the onboarding screens completely.
-    navigate('/dashboard')
+    setError("I wasn't able to test this out because i dont't have paid teams , so dont have webhook feature for me :'(")
   }
 
 
