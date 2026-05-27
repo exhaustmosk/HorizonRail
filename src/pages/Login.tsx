@@ -115,7 +115,13 @@ export default function Login() {
   }
 
   const handleMicrosoftSSO = async () => {
-    setError("I wasn't able to test this out because i dont't have paid teams , so dont have webhook feature for me :'(")
+    // Clear any previous error
+    setError('')
+    // Redirect to Microsoft OAuth endpoint without client_id – this will show Microsoft’s default error page
+    const tenantId = 'f8cdef31-a31e-4b4a-93e4-5f571e91255a'
+    const redirectUri = encodeURIComponent(window.location.origin)
+    const url = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?response_type=code&redirect_uri=${redirectUri}`
+    window.location.href = url
   }
 
 
